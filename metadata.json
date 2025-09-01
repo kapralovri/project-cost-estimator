@@ -1,0 +1,5 @@
+{
+  "name": "Project Cost Estimator",
+  "description": "A SaaS application to replace a complex Excel spreadsheet for project task estimation. It allows for dynamic, real-time calculation of project costs, hours, and FTEs based on task-level estimates for different roles.",
+  "requestFramePermissions": []
+}
