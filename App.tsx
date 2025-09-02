@@ -279,16 +279,23 @@ const App: React.FC = () => {
 
     const projectsWithTotals = useMemo(() => {
         return projects.map(p => {
-            const totalSpecialtyHours = p.tasks.reduce((taskSum, task) => {
-                const taskBase = Object.values(task.estimates).reduce((sum, e) => sum + pert(e), 0);
-                return taskSum + taskBase;
+            const isManualTesting = !!p.parameters.isManualTesting;
+            const totalHours = p.tasks.reduce((sum, task) => {
+                const getRoleHours = (role: RoleKey) => task.isRisk ? task.estimates[role].max : pert(task.estimates[role]);
+                const analysis = getRoleHours('analysis');
+                const frontDev = getRoleHours('frontDev');
+                const backDev = getRoleHours('backDev');
+                const devops = getRoleHours('devops');
+                const design = getRoleHours('design');
+                const techWriter = getRoleHours('techWriter');
+                const testing = isManualTesting ? getRoleHours('testing') : (frontDev + backDev) * (p.parameters.testing / 100);
+
+                const base = analysis + frontDev + backDev + devops + design + techWriter + testing;
+                const risk = base * (p.parameters.risks / 100);
+                const general = (base + risk) * (p.parameters.general / 100);
+                const management = (base + risk + general) * (p.parameters.management / 100);
+                return sum + base + risk + general + management;
             }, 0);
-            
-            const totalManagementHours = totalSpecialtyHours * (p.parameters.management / 100);
-            const totalHoursBeforeOverheads = totalSpecialtyHours + totalManagementHours;
-            const riskHours = totalHoursBeforeOverheads * (p.parameters.risks / 100);
-            const generalExpensesHours = totalHoursBeforeOverheads * (p.parameters.general / 100);
-            const totalHours = totalHoursBeforeOverheads + riskHours + generalExpensesHours;
 
             return { ...p, totalHours: Math.round(totalHours) };
         });

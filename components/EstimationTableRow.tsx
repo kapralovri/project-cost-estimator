@@ -298,7 +298,7 @@ export const EstimationTableRow: React.FC<EstimationTableRowProps> = ({ task, pa
             <td className="px-2 py-2 text-center">{generalHours}</td>
             <td className="px-2 py-2 text-center">{managementHours}</td>
             <td className="px-2 py-2 text-center font-bold bg-secondary/70">{totalHours}</td>
-            <td className="px-2 py-2 text-center font-bold text-primary bg-primary/20">{baseEstimate}</td>
+            <td className="px-2 py-2 text-center font-bold text-primary">{baseEstimate}</td>
         </tr>
     );
 };

@@ -206,6 +206,32 @@ export const EstimatorPage: React.FC<EstimatorPageProps> = ({ project, onSave, o
 
   }, [tasks, parameters]);
 
+  // Сумма "Итого" из раздела "Оценка проекта" по всем задачам
+  const tableTotalHours = useMemo(() => {
+    const pert = (e: Estimate) => (e.min + 4 * e.real + e.max) / 6;
+    const getRoleHours = (task: Task, role: RoleKey) => task.isRisk ? task.estimates[role].max : pert(task.estimates[role]);
+
+    return Math.round(tasks.reduce((sum, task) => {
+      const isManualTesting = !!parameters.isManualTesting;
+      const analysis = getRoleHours(task, 'analysis');
+      const frontDev = getRoleHours(task, 'frontDev');
+      const backDev = getRoleHours(task, 'backDev');
+      const devops = getRoleHours(task, 'devops');
+      const design = getRoleHours(task, 'design');
+      const techWriter = getRoleHours(task, 'techWriter');
+      const testing = isManualTesting
+        ? getRoleHours(task, 'testing')
+        : (frontDev + backDev) * (parameters.testing / 100);
+
+      const base = analysis + frontDev + backDev + devops + design + techWriter + testing;
+      const risk = base * (parameters.risks / 100);
+      const general = (base + risk) * (parameters.general / 100);
+      const management = (base + risk + general) * (parameters.management / 100);
+      const total = base + risk + general + management;
+      return sum + total;
+    }, 0));
+  }, [tasks, parameters]);
+
   const handleSave = useCallback(() => {
     setIsSaving(true);
     // Simulate API call
@@ -213,11 +239,11 @@ export const EstimatorPage: React.FC<EstimatorPageProps> = ({ project, onSave, o
       onSave(project.id, {
         tasks,
         parameters,
-        totalHours: roleAnalyticsData.totalHours
+        totalHours: tableTotalHours
       });
       setIsSaving(false);
     }, 1000);
-  }, [project.id, tasks, parameters, onSave, roleAnalyticsData.totalHours]);
+  }, [project.id, tasks, parameters, onSave, tableTotalHours]);
 
   if (isTableFullscreen) {
     return (
@@ -254,7 +280,7 @@ export const EstimatorPage: React.FC<EstimatorPageProps> = ({ project, onSave, o
               qualityLevel={project.qualityLevel}
               parameters={parameters}
               setParameters={setParameters}
-              totalHours={roleAnalyticsData.totalHours}
+              totalHours={tableTotalHours}
               totalFTE={roleAnalyticsData.totalFTE}
               overheadTotals={roleAnalyticsData.overheadTotals}
             />
