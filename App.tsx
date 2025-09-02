@@ -83,9 +83,9 @@ const App: React.FC = () => {
                         }
 
                         return {
-                            id: task.id?.toString() || `task-${Date.now()}`,
-                            stage: task.category || 'development',
-                            name: task.name,
+                            id: task.id || Date.now(),
+                            stage: task.stageName || task.category || 'development',
+                            name: task.taskName,
                             isRisk: task.complexity === 'high',
                             estimates,
                         };
@@ -242,8 +242,8 @@ const App: React.FC = () => {
                 ];
 
                 return {
-                    name: task.name,
-                    description: task.name,
+                    taskName: task.name,
+                    stageName: task.stage,
                     category: task.stage,
                     complexity: task.isRisk ? 'high' : 'medium',
                     estimatedHours: 0, // Пока не используем

@@ -1,3 +1,5 @@
+import type { Task } from './types';
+
 export interface BackendEstimateItemDto {
   id?: number;
   estimateId?: number;
@@ -30,8 +32,8 @@ export interface BackendParameterDto {
 export interface BackendTaskDto {
   id?: number;
   estimateId?: number;
-  name: string;
-  description?: string;
+  taskName: string;
+  stageName?: string;
   category?: string;
   complexity?: string;
   estimatedHours?: number;
@@ -73,8 +75,25 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
     const text = await res.text().catch(() => '');
     throw new Error(`HTTP ${res.status}: ${text}`);
   }
-  if (res.status === 204) return undefined as unknown as T;
-  return res.json() as Promise<T>;
+  
+  // Для пустых ответов (204 No Content) или когда нет тела ответа
+  if (res.status === 204 || res.headers.get('content-length') === '0') {
+    return undefined as unknown as T;
+  }
+  
+  // Проверяем, есть ли тело ответа
+  const text = await res.text();
+  if (!text || text.trim() === '') {
+    return undefined as unknown as T;
+  }
+  
+  // Парсим JSON только если есть содержимое
+  try {
+    return JSON.parse(text) as T;
+  } catch (e) {
+    // Если не удалось распарсить JSON, возвращаем undefined для void типов
+    return undefined as unknown as T;
+  }
 }
 
 export const api = {
@@ -129,5 +148,66 @@ export const api = {
     http<BackendTaskDto>(`/api/estimates/${estimateId}/tasks/${taskId}`, {
       method: 'PUT',
       body: JSON.stringify(task),
-    }),
+          }),
+  };
+
+export const importExcelFromBackend = async (file: File, estimateId: number): Promise<Task[]> => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(`${API_BASE}/api/excel/import/${estimateId}`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  const data = await response.json();
+  
+  // Конвертируем данные из бэкенда в формат фронта
+  return data.map((task: any) => ({
+    id: task.id,
+    stage: task.stageName, // stageName с бэкенда содержит этап
+    name: task.taskName,   // taskName с бэкенда содержит задачу
+    isRisk: false, // Пока не поддерживается в TaskDto
+    estimates: {
+      analysis: {
+        min: Number(task.estimates.find((e: any) => e.role === 'analysis')?.min || 0),
+        real: Number(task.estimates.find((e: any) => e.role === 'analysis')?.real || 0),
+        max: Number(task.estimates.find((e: any) => e.role === 'analysis')?.max || 0),
+      },
+      frontDev: {
+        min: Number(task.estimates.find((e: any) => e.role === 'frontDev')?.min || 0),
+        real: Number(task.estimates.find((e: any) => e.role === 'frontDev')?.real || 0),
+        max: Number(task.estimates.find((e: any) => e.role === 'frontDev')?.max || 0),
+      },
+      backDev: {
+        min: Number(task.estimates.find((e: any) => e.role === 'backDev')?.min || 0),
+        real: Number(task.estimates.find((e: any) => e.role === 'backDev')?.real || 0),
+        max: Number(task.estimates.find((e: any) => e.role === 'backDev')?.max || 0),
+      },
+      testing: {
+        min: Number(task.estimates.find((e: any) => e.role === 'testing')?.min || 0),
+        real: Number(task.estimates.find((e: any) => e.role === 'testing')?.real || 0),
+        max: Number(task.estimates.find((e: any) => e.role === 'testing')?.max || 0),
+      },
+      devops: {
+        min: Number(task.estimates.find((e: any) => e.role === 'devops')?.min || 0),
+        real: Number(task.estimates.find((e: any) => e.role === 'devops')?.real || 0),
+        max: Number(task.estimates.find((e: any) => e.role === 'devops')?.max || 0),
+      },
+      design: {
+        min: Number(task.estimates.find((e: any) => e.role === 'design')?.min || 0),
+        real: Number(task.estimates.find((e: any) => e.role === 'design')?.real || 0),
+        max: Number(task.estimates.find((e: any) => e.role === 'design')?.max || 0),
+      },
+      techWriter: {
+        min: Number(task.estimates.find((e: any) => e.role === 'techWriter')?.min || 0),
+        real: Number(task.estimates.find((e: any) => e.role === 'techWriter')?.real || 0),
+        max: Number(task.estimates.find((e: any) => e.role === 'techWriter')?.max || 0),
+      },
+    },
+  }));
 };

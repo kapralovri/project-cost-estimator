@@ -1,8 +1,10 @@
 
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import type { Task, ProjectParameters, Estimate, RoleKey } from '../types';
 import { EstimationTableRow } from './EstimationTableRow';
 import { PlusIcon, ExpandIcon, CollapseIcon, ImportIcon } from './icons';
+import { Spinner } from './Spinner';
+import { importExcelFromBackend } from '../api';
 
 // Make XLSX available from the script loaded in index.html
 declare var XLSX: any;
@@ -41,88 +43,64 @@ const roleEstimateGroups: { name: string, key: RoleKey }[] = [
 
 export const EstimationTable: React.FC<EstimationTableProps> = ({ tasks, parameters, estimateId, onTaskChange, onAddTask, onRemoveTask, onImportTasks, isFullscreen, toggleFullscreen }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isImporting, setIsImporting] = useState(false);
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
   };
 
-  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file || !estimateId) return;
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        try {
-            const data = e.target?.result;
-            const workbook = XLSX.read(data, { type: 'array' });
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-            const json: any[] = XLSX.utils.sheet_to_json(worksheet);
-
-            const newTasks: Task[] = json.map((row, index) => {
-                const estimates: Record<RoleKey, Estimate> = {} as any;
-                roleEstimateGroups.forEach(group => {
-                    estimates[group.key] = {
-                        min: Number(row[`${group.name} Мин`]) || 0,
-                        real: Number(row[`${group.name} Реал`]) || 0,
-                        max: Number(row[`${group.name} Макс`]) || 0,
-                    };
-                });
-                
-                const isRisk = ['да', 'yes', 'true', '1'].includes(String(row['Риск'] || '').toLowerCase());
-
-                return {
-                    id: Date.now() + index, // Генерируем числовой ID
-                    stage: String(row['Этап, Модуль'] || ''),
-                    name: String(row['Функциональное требование'] || ''),
-                    isRisk,
-                    estimates,
-                };
-            });
-
-            onImportTasks(newTasks);
-
-        } catch (error) {
-            console.error("Error parsing Excel file:", error);
-            alert("Не удалось обработать файл. Убедитесь, что он имеет правильный формат и заголовки столбцов.");
-        } finally {
-            // Reset file input to allow importing the same file again
-            if (fileInputRef.current) {
-                fileInputRef.current.value = '';
-            }
-        }
-    };
-    reader.readAsArrayBuffer(file);
+    setIsImporting(true);
+    try {
+      // Используем новую API для импорта через бэкенд
+      const importedTasks = await importExcelFromBackend(file, estimateId);
+      onImportTasks(importedTasks);
+    } catch (error) {
+      console.error("Error importing Excel file:", error);
+      alert("Не удалось импортировать файл. Убедитесь, что он имеет правильный формат.");
+    } finally {
+      // Reset file input to allow importing the same file again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      setIsImporting(false);
+    }
   };
 
   return (
-    <div className={`bg-card rounded-lg shadow-lg flex flex-col ${isFullscreen ? 'h-full' : ''}`}>
-      <div className="flex justify-between items-center p-4 border-b border-border">
-          <h3 className="text-lg font-bold text-card-foreground">Оценка проекта</h3>
-          <div className="flex items-center space-x-2">
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileImport}
-              className="hidden"
-              accept=".xlsx, .xls"
-            />
-            <button
-              onClick={handleImportClick}
-              className="p-2 rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              aria-label="Импорт из Excel"
-            >
-              <ImportIcon />
-            </button>
-            <button 
-              onClick={toggleFullscreen} 
-              className="p-2 rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              aria-label={isFullscreen ? "Выйти из полноэкранного режима" : "Перейти в полноэкранный режим"}
-            >
-                {isFullscreen ? <CollapseIcon /> : <ExpandIcon />}
-            </button>
-          </div>
-      </div>
+    <>
+      {isImporting && <Spinner fullscreen size="lg" />}
+      <div className={`bg-card rounded-lg shadow-lg flex flex-col ${isFullscreen ? 'h-full' : ''}`}>
+        <div className="flex justify-between items-center p-4 border-b border-border">
+            <h3 className="text-lg font-bold text-card-foreground">Оценка проекта</h3>
+            <div className="flex items-center space-x-2">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileImport}
+                className="hidden"
+                accept=".xlsx, .xls"
+              />
+              <button
+                onClick={handleImportClick}
+                disabled={isImporting}
+                className="p-2 rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Импорт из Excel"
+              >
+                <ImportIcon />
+              </button>
+              <button 
+                onClick={toggleFullscreen} 
+                className="p-2 rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                aria-label={isFullscreen ? "Выйти из полноэкранного режима" : "Перейти в полноэкранный режим"}
+              >
+                  {isFullscreen ? <CollapseIcon /> : <ExpandIcon />}
+              </button>
+            </div>
+        </div>
       <div className="overflow-auto flex-grow">
         <table className="w-full min-w-max text-sm text-left">
           <thead className="text-xs text-muted-foreground uppercase bg-secondary/50">
@@ -178,5 +156,6 @@ export const EstimationTable: React.FC<EstimationTableProps> = ({ tasks, paramet
         </button>
       </div>
     </div>
+    </>
   );
 };

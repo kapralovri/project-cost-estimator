@@ -27,8 +27,8 @@ export const EstimatorPage: React.FC<EstimatorPageProps> = ({ project, onSave, o
     if (project.backendId) {
       try {
         const taskDto = {
-          name: 'Новая задача',
-          description: 'Новая задача',
+          taskName: 'Новая задача',
+          stageName: 'Новый этап',
           category: 'Новый этап',
           complexity: 'medium',
           estimatedHours: 0,
@@ -47,7 +47,6 @@ export const EstimatorPage: React.FC<EstimatorPageProps> = ({ project, onSave, o
         };
         
         const savedTask = await api.addTask(project.backendId, taskDto);
-        console.log('Task added successfully:', savedTask);
         
         if (!savedTask.id) {
           console.error('Backend returned task without ID');
@@ -57,8 +56,8 @@ export const EstimatorPage: React.FC<EstimatorPageProps> = ({ project, onSave, o
         // Создаем задачу с ID из backend
         const newTask: Task = {
           id: savedTask.id, // ID из backend
-          name: savedTask.name,
-          stage: savedTask.category || 'Новый этап',
+          name: savedTask.taskName,
+          stage: savedTask.stageName || savedTask.category || 'Новый этап',
           isRisk: savedTask.complexity === 'high',
           estimates: {
             analysis: { min: 0, real: 0, max: 0 },
@@ -103,7 +102,6 @@ export const EstimatorPage: React.FC<EstimatorPageProps> = ({ project, onSave, o
     if (project.backendId) {
       try {
         await api.removeTask(project.backendId, id);
-        console.log('Task removed successfully');
       } catch (error) {
         console.error('Failed to remove task:', error);
       }

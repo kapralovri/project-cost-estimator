@@ -49,11 +49,8 @@ export const EstimationTableRow: React.FC<EstimationTableRowProps> = ({ task, pa
 
     const saveEstimateToBackend = useCallback(async (role: RoleKey, estimate: Estimate) => {
         if (!estimateId || !task.id) {
-            console.log('No estimateId or task.id:', { estimateId, taskId: task.id });
             return;
         }
-        
-        console.log('Saving estimate to backend:', { estimateId, taskId: task.id, role, estimate });
         
         try {
             await api.updateTaskEstimate(estimateId, task.id, role, {
@@ -62,7 +59,6 @@ export const EstimationTableRow: React.FC<EstimationTableRowProps> = ({ task, pa
                 real: estimate.real,
                 max: estimate.max,
             });
-            console.log('Estimate saved successfully');
         } catch (error) {
             console.error('Failed to save estimate:', error);
         }
@@ -70,16 +66,13 @@ export const EstimationTableRow: React.FC<EstimationTableRowProps> = ({ task, pa
 
     const saveTaskToBackend = useCallback(async (updatedTask: Task) => {
         if (!estimateId || !task.id) {
-            console.log('No estimateId or task.id for task save:', { estimateId, taskId: task.id });
             return;
         }
         
-        console.log('Saving task to backend:', { estimateId, taskId: task.id, updatedTask });
-        
         try {
             const taskDto = {
-                name: updatedTask.name,
-                description: updatedTask.name,
+                taskName: updatedTask.name,
+                stageName: updatedTask.stage,
                 category: updatedTask.stage,
                 complexity: updatedTask.isRisk ? 'high' : 'medium',
                 estimatedHours: 0,
@@ -98,7 +91,6 @@ export const EstimationTableRow: React.FC<EstimationTableRowProps> = ({ task, pa
             };
             
             await api.updateTask(estimateId, task.id, taskDto);
-            console.log('Task saved successfully');
         } catch (error) {
             console.error('Failed to save task:', error);
         }
