@@ -116,4 +116,18 @@ export const api = {
   removeTask: (estimateId: number, taskId: number) => http<void>(`/api/estimates/${estimateId}/tasks/${taskId}`, {
     method: 'DELETE',
   }),
+  
+  // Task Estimates
+  updateTaskEstimate: (estimateId: number, taskId: number, role: string, estimate: BackendTaskEstimateDto) => 
+    http<BackendTaskEstimateDto>(`/api/estimates/${estimateId}/tasks/${taskId}/estimates/${role}`, {
+      method: 'PUT',
+      body: JSON.stringify(estimate),
+    }),
+  
+  // Tasks
+  updateTask: (estimateId: number, taskId: number, task: BackendTaskDto) => 
+    http<BackendTaskDto>(`/api/estimates/${estimateId}/tasks/${taskId}`, {
+      method: 'PUT',
+      body: JSON.stringify(task),
+    }),
 };

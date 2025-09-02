@@ -7,7 +7,7 @@ export interface Estimate {
 export type RoleKey = 'analysis' | 'frontDev' | 'backDev' | 'testing' | 'devops' | 'design' | 'techWriter';
 
 export interface Task {
-  id: string;
+  id: number;
   stage: string;
   name: string;
   isRisk: boolean;

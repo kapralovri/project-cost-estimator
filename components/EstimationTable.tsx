@@ -10,9 +10,10 @@ declare var XLSX: any;
 interface EstimationTableProps {
   tasks: Task[];
   parameters: ProjectParameters;
-  onTaskChange: (id: string, updatedTask: Task) => void;
+  estimateId?: number;
+  onTaskChange: (id: number, updatedTask: Task) => void;
   onAddTask: () => void;
-  onRemoveTask: (id: string) => void;
+  onRemoveTask: (id: number) => void;
   onImportTasks: (tasks: Task[]) => void;
   isFullscreen: boolean;
   toggleFullscreen: () => void;
@@ -38,7 +39,7 @@ const roleEstimateGroups: { name: string, key: RoleKey }[] = [
     { name: 'Технические писатели', key: 'techWriter' },
 ];
 
-export const EstimationTable: React.FC<EstimationTableProps> = ({ tasks, parameters, onTaskChange, onAddTask, onRemoveTask, onImportTasks, isFullscreen, toggleFullscreen }) => {
+export const EstimationTable: React.FC<EstimationTableProps> = ({ tasks, parameters, estimateId, onTaskChange, onAddTask, onRemoveTask, onImportTasks, isFullscreen, toggleFullscreen }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleImportClick = () => {
@@ -71,7 +72,7 @@ export const EstimationTable: React.FC<EstimationTableProps> = ({ tasks, paramet
                 const isRisk = ['да', 'yes', 'true', '1'].includes(String(row['Риск'] || '').toLowerCase());
 
                 return {
-                    id: `imported-${Date.now()}-${index}`,
+                    id: Date.now() + index, // Генерируем числовой ID
                     stage: String(row['Этап, Модуль'] || ''),
                     name: String(row['Функциональное требование'] || ''),
                     isRisk,
@@ -159,6 +160,7 @@ export const EstimationTable: React.FC<EstimationTableProps> = ({ tasks, paramet
                 key={task.id}
                 task={task}
                 parameters={parameters}
+                estimateId={estimateId}
                 onTaskChange={onTaskChange}
                 onRemoveTask={onRemoveTask}
               />
