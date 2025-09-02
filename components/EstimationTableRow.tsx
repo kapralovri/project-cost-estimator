@@ -2,6 +2,7 @@ import React, { useMemo, useCallback, useRef, useEffect } from 'react';
 import type { Task, Estimate, ProjectParameters, RoleKey } from '../types';
 import { TrashIcon } from './icons';
 import { api } from '../api';
+import { AutoResizeTextarea } from './AutoResizeTextarea';
 
 interface EstimationTableRowProps {
   task: Task;
@@ -220,32 +221,30 @@ export const EstimationTableRow: React.FC<EstimationTableRowProps> = ({ task, pa
                     <TrashIcon />
                 </button>
             </td>
-            <td className="px-3 py-2 sticky left-12 bg-card group-hover:bg-secondary/50 z-10 transition-colors">
-                <input 
-                    type="text" 
-                    value={task.stage} 
-                    onChange={(e) => handleTextChange('stage', e.target.value)} 
-                    onBlur={() => {
-                        if (estimateId) {
-                            const updatedTask = { ...task, stage: task.stage };
-                            saveTaskToBackend(updatedTask);
-                        }
-                    }}
-                    className="bg-transparent w-full focus:outline-none focus:bg-input p-1 rounded min-w-[138px]" 
+            <td className="px-3 py-2 sticky left-12 bg-card group-hover:bg-secondary/50 z-10 transition-colors align-top">
+                <AutoResizeTextarea
+                  value={task.stage}
+                  onChange={(v) => handleTextChange('stage', v)}
+                  onBlur={() => {
+                    if (estimateId) {
+                      const updatedTask = { ...task, stage: task.stage };
+                      saveTaskToBackend(updatedTask);
+                    }
+                  }}
+                  className="bg-transparent w-full focus:outline-none focus:bg-input p-1 rounded min-w-[138px]"
                 />
             </td>
-            <td className="px-3 py-2 sticky left-[210px] bg-card group-hover:bg-secondary/50 z-10 transition-colors">
-                <input 
-                    type="text" 
-                    value={task.name} 
-                    onChange={(e) => handleTextChange('name', e.target.value)} 
-                    onBlur={() => {
-                        if (estimateId) {
-                            const updatedTask = { ...task, name: task.name };
-                            saveTaskToBackend(updatedTask);
-                        }
-                    }}
-                    className="bg-transparent w-full focus:outline-none focus:bg-input p-1 rounded min-w-[188px]" 
+            <td className="px-3 py-2 sticky left-[210px] bg-card group-hover:bg-secondary/50 z-10 transition-colors align-top">
+                <AutoResizeTextarea
+                  value={task.name}
+                  onChange={(v) => handleTextChange('name', v)}
+                  onBlur={() => {
+                    if (estimateId) {
+                      const updatedTask = { ...task, name: task.name };
+                      saveTaskToBackend(updatedTask);
+                    }
+                  }}
+                  className="bg-transparent w-full focus:outline-none focus:bg-input p-1 rounded min-w-[188px]"
                 />
             </td>
             <td className="px-3 py-2 sticky left-[410px] bg-card group-hover:bg-secondary/50 z-10 transition-colors text-center">
