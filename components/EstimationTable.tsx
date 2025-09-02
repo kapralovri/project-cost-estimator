@@ -103,7 +103,7 @@ export const EstimationTable: React.FC<EstimationTableProps> = ({ tasks, paramet
         </div>
       <div className="overflow-auto flex-grow">
         <table className="w-full min-w-max text-sm text-left">
-          <thead className="text-xs text-muted-foreground uppercase bg-secondary/50">
+          <thead className="text-xs text-muted-foreground uppercase bg-secondary/70 sticky top-0 z-30">
             <tr>
               <th scope="col" className="px-3 py-3 w-12 sticky left-0 bg-secondary/50 z-20"></th>
               <th scope="col" className="px-3 py-3 min-w-[150px] sticky left-12 bg-secondary/50 z-20">Этап, Модуль</th>

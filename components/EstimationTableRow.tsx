@@ -33,6 +33,7 @@ const EstimateCell: React.FC<{
     <td className="px-1 py-1">
         <input
             type="number"
+            min={0}
             value={value}
             onChange={onChange}
             onBlur={onBlur}
@@ -189,16 +190,19 @@ export const EstimationTableRow: React.FC<EstimationTableRowProps> = ({ task, pa
 
     const { baseEstimate, riskHours, generalHours, managementHours, totalHours } = useMemo(() => {
         const values = Object.values(pertValues) as number[];
-        const totalBaseWithTesting = values.reduce((sum: number, val: number) => sum + (val || 0), 0);
-        
-        const management = totalBaseWithTesting * (parameters.management / 100);
-        const subTotal = totalBaseWithTesting + management;
-        const risk = subTotal * (parameters.risks / 100);
-        const general = subTotal * (parameters.general / 100);
-        const total = subTotal + risk + general;
+        const base = values.reduce((sum: number, val: number) => sum + (val || 0), 0);
+
+        // Новая логика: риски и общие считаются от базы,
+        // а "Упр." считается от (База + Риски + Общие)
+        const risk = base * (parameters.risks / 100);
+        // Общие: (base + risk) * (general% / 100)
+        const general = (base + risk) * (parameters.general / 100);
+        const management = (base + risk + general) * (parameters.management / 100);
+
+        const total = base + risk + general + management;
         
         return {
-            baseEstimate: Math.round(totalBaseWithTesting),
+            baseEstimate: Math.round(base),
             riskHours: Math.round(risk),
             generalHours: Math.round(general),
             managementHours: Math.round(management),
@@ -255,7 +259,7 @@ export const EstimationTableRow: React.FC<EstimationTableRowProps> = ({ task, pa
                 <React.Fragment key={group.key}>
                     <EstimateCell 
                         value={task.estimates[group.key].min} 
-                        onChange={(e) => handleEstimateChange(group.key, 'min', Number(e.target.value))} 
+                        onChange={(e) => handleEstimateChange(group.key, 'min', Math.max(0, Number(e.target.value) || 0))} 
                         onBlur={() => {
                             if (estimateId) {
                                 saveEstimateToBackend(group.key, task.estimates[group.key]);
@@ -265,7 +269,7 @@ export const EstimationTableRow: React.FC<EstimationTableRowProps> = ({ task, pa
                     />
                     <EstimateCell 
                         value={task.estimates[group.key].real} 
-                        onChange={(e) => handleEstimateChange(group.key, 'real', Number(e.target.value))} 
+                        onChange={(e) => handleEstimateChange(group.key, 'real', Math.max(0, Number(e.target.value) || 0))} 
                         onBlur={() => {
                             if (estimateId) {
                                 saveEstimateToBackend(group.key, task.estimates[group.key]);
@@ -275,7 +279,7 @@ export const EstimationTableRow: React.FC<EstimationTableRowProps> = ({ task, pa
                     />
                     <EstimateCell 
                         value={task.estimates[group.key].max} 
-                        onChange={(e) => handleEstimateChange(group.key, 'max', Number(e.target.value))} 
+                        onChange={(e) => handleEstimateChange(group.key, 'max', Math.max(0, Number(e.target.value) || 0))} 
                         onBlur={() => {
                             if (estimateId) {
                                 saveEstimateToBackend(group.key, task.estimates[group.key]);
