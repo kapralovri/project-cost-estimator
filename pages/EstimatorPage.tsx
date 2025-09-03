@@ -128,79 +128,119 @@ export const EstimatorPage: React.FC<EstimatorPageProps> = ({ project, onSave, o
       { key: 'design', name: 'Дизайнеры' },
       { key: 'pm', name: 'РП и Администратор' },
     ];
-    
+
     const isManualTesting = !!parameters.isManualTesting;
     const pert = (e: Estimate) => (e.min + 4 * e.real + e.max) / 6;
-    const getTaskHours = (task: Task, estimate: Estimate) => task.isRisk ? estimate.max : pert(estimate);
-    
-    const specialtyHoursByRole: Record<string, number> = {
-        developers: 0, qa: 0, analysis: 0, devops: 0, techWriter: 0, design: 0, pm: 0,
+    const getTaskHours = (task: Task, estimate: Estimate) => (task.isRisk ? estimate.max : pert(estimate));
+
+    // 1) База по ролям (без PM)
+    const baseByRole: Record<string, number> = {
+      developers: 0, qa: 0, analysis: 0, devops: 0, techWriter: 0, design: 0,
     };
 
     tasks.forEach(task => {
-        const frontDevHours = getTaskHours(task, task.estimates.frontDev);
-        const backDevHours = getTaskHours(task, task.estimates.backDev);
-
-        specialtyHoursByRole.analysis += getTaskHours(task, task.estimates.analysis);
-        specialtyHoursByRole.developers += frontDevHours + backDevHours;
-        specialtyHoursByRole.devops += getTaskHours(task, task.estimates.devops);
-        specialtyHoursByRole.design += getTaskHours(task, task.estimates.design);
-        specialtyHoursByRole.techWriter += getTaskHours(task, task.estimates.techWriter);
-        
-        if (isManualTesting) {
-            specialtyHoursByRole.qa += getTaskHours(task, task.estimates.testing);
-        } else {
-            specialtyHoursByRole.qa += (frontDevHours + backDevHours) * (parameters.testing / 100);
-        }
+      const frontDev = getTaskHours(task, task.estimates.frontDev);
+      const backDev = getTaskHours(task, task.estimates.backDev);
+      baseByRole.analysis += getTaskHours(task, task.estimates.analysis);
+      baseByRole.developers += frontDev + backDev;
+      baseByRole.devops += getTaskHours(task, task.estimates.devops);
+      baseByRole.design += getTaskHours(task, task.estimates.design);
+      baseByRole.techWriter += getTaskHours(task, task.estimates.techWriter);
+      baseByRole.qa += isManualTesting
+        ? getTaskHours(task, task.estimates.testing)
+        : (frontDev + backDev) * (parameters.testing / 100);
     });
-    
-    const totalSpecialtyHours = Object.values(specialtyHoursByRole).reduce((sum, h) => sum + h, 0);
-    const totalManagementHours = totalSpecialtyHours * (parameters.management / 100);
-    specialtyHoursByRole.pm = totalManagementHours;
-    
-    const totalHoursBeforeOverheads = totalSpecialtyHours + totalManagementHours;
-    
-    const riskHours = totalHoursBeforeOverheads * (parameters.risks / 100);
-    const generalExpensesHours = totalHoursBeforeOverheads * (parameters.general / 100);
-    const vacationHours = totalHoursBeforeOverheads * (parameters.vacation / 100);
-    const sickLeaveHours = totalHoursBeforeOverheads * (parameters.sick_leave / 100);
-    const meetingsHours = totalHoursBeforeOverheads * (parameters.meetings / 100);
-    const onboardingHours = totalHoursBeforeOverheads * (parameters.onboarding / 100);
 
-    const totalHours = totalHoursBeforeOverheads + riskHours + generalExpensesHours;
+    const base = Object.values(baseByRole).reduce((s, v) => s + v, 0);
+    const risk = base * (parameters.risks / 100);
+    const general = (base + risk) * (parameters.general / 100);
+    const management = (base + risk + general) * (parameters.management / 100);
 
-    const analytics = roles.map(role => {
-        const specialtyHours = specialtyHoursByRole[role.key] || 0;
-        const roleProportion = totalHoursBeforeOverheads > 0 ? specialtyHours / totalHoursBeforeOverheads : 0;
-        const roleRiskHours = riskHours * roleProportion;
-        const roleGeneralHours = generalExpensesHours * roleProportion;
-        const roleTotalHours = specialtyHours + roleRiskHours + roleGeneralHours;
+    // 2) Распределение рисков и общих
+    const roleRiskShares: Record<string, number> = {};
+    const roleGeneralShares: Record<string, number> = {};
+    const safeBase = base > 0 ? base : 1; // защита от деления на 0
+    const safeBasePlusRisk = (base + risk) > 0 ? (base + risk) : 1;
 
+    Object.keys(baseByRole).forEach(key => {
+      const roleBase = baseByRole[key] || 0;
+      const riskShare = (roleBase / safeBase) * risk;
+      roleRiskShares[key] = riskShare;
+      const generalShare = ((roleBase + riskShare) / safeBasePlusRisk) * general;
+      roleGeneralShares[key] = generalShare;
+    });
+
+    // 3) Собираем аналитику по ролям
+    const analyticsRaw = roles.map(role => {
+      if (role.key === 'pm') {
+        const total = management;
         return {
-            name: role.name,
-            specialtyHours: Math.round(specialtyHours),
-            riskHours: Math.round(roleRiskHours),
-            generalHours: Math.round(roleGeneralHours),
-            totalHours: Math.round(roleTotalHours),
-            distribution: totalHours > 0 ? (roleTotalHours / totalHours) * 100 : 0,
-            fte: roleTotalHours / 168,
+          name: role.name,
+          specialtyHours: Math.round(management),
+          riskHours: 0,
+          generalHours: 0,
+          totalHours: Math.round(total),
+          distribution: 0, // вычислим позже
+          fte: total / 168,
         };
+      }
+
+      const spec = baseByRole[role.key] || 0;
+      const r = roleRiskShares[role.key] || 0;
+      const g = roleGeneralShares[role.key] || 0;
+      const total = spec + r + g;
+      return {
+        name: role.name,
+        specialtyHours: Math.round(spec),
+        riskHours: Math.round(r),
+        generalHours: Math.round(g),
+        totalHours: Math.round(total),
+        distribution: 0, // позже
+        fte: total / 168,
+      };
     });
 
-    const totalCalculatedHours = analytics.reduce((sum, r) => sum + r.totalHours, 0);
-    
+    // 4) Балансировка округления по total
+    const targetTotal = Math.round(base + risk + general + management);
+    const currentSum = analyticsRaw.reduce((s, r) => s + r.totalHours, 0);
+    const delta = targetTotal - currentSum;
+    if (delta !== 0) {
+      const pmIdx = analyticsRaw.findIndex(r => r.name === 'РП и Администратор');
+      if (pmIdx >= 0) {
+        analyticsRaw[pmIdx] = {
+          ...analyticsRaw[pmIdx],
+          totalHours: analyticsRaw[pmIdx].totalHours + delta,
+          specialtyHours: analyticsRaw[pmIdx].specialtyHours + delta,
+        };
+      }
+    }
+
+    const totalCalculatedHours = analyticsRaw.reduce((s, r) => s + r.totalHours, 0);
+
+    // 5) Финальные проценты распределения
+    const analytics = analyticsRaw.map(r => ({
+      ...r,
+      distribution: totalCalculatedHours > 0 ? (r.totalHours / totalCalculatedHours) * 100 : 0,
+    }));
+
+    // 6) Сводки по накладным (для отображения), согласованные с формулой
+    const vacationHours = base * (parameters.vacation / 100);
+    const sickLeaveHours = base * (parameters.sick_leave / 100);
+    const meetingsHours = base * (parameters.meetings / 100);
+    const onboardingHours = base * (parameters.onboarding / 100);
+
     return {
       analytics,
-      totalHours: Math.round(totalCalculatedHours),
+      totalHours: totalCalculatedHours,
       totalFTE: totalCalculatedHours / 168,
       overheadTotals: {
-          risks: Math.round(riskHours),
-          management: Math.round(totalManagementHours),
-          general: Math.round(generalExpensesHours),
-          vacation: Math.round(vacationHours),
-          sick_leave: Math.round(sickLeaveHours),
-          meetings: Math.round(meetingsHours),
-          onboarding: Math.round(onboardingHours),
+        risks: Math.round(risk),
+        management: Math.round(management),
+        general: Math.round(general),
+        vacation: Math.round(vacationHours),
+        sick_leave: Math.round(sickLeaveHours),
+        meetings: Math.round(meetingsHours),
+        onboarding: Math.round(onboardingHours),
       }
     };
 
