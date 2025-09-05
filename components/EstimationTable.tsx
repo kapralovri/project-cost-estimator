@@ -164,6 +164,7 @@ export const EstimationTable: React.FC<EstimationTableProps> = ({ tasks, paramet
             onTaskChange={onTaskChange}
             onRemoveTask={onRemoveTask}
             onAddTask={onAddTask}
+            estimateId={estimateId}
           />
         </div>
       )}

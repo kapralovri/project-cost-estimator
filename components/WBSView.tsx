@@ -1,7 +1,8 @@
-import React, { useMemo, useCallback, useState } from 'react';
+import React, { useMemo, useCallback, useState, useRef } from 'react';
 import type { Task, ProjectParameters, RoleKey, Estimate } from '../types';
 import { TrashIcon, PlusIcon } from './icons';
 import AutoResizeTextarea from './AutoResizeTextarea';
+import { api } from '../api';
 
 interface WBSViewProps {
   tasks: Task[];
@@ -9,6 +10,7 @@ interface WBSViewProps {
   onTaskChange: (id: number, updatedTask: Task) => void;
   onRemoveTask: (id: number) => void;
   onAddTask: (stage?: string) => void;
+  estimateId?: number;
 }
 
 const roles: { key: RoleKey; label: string }[] = [
@@ -21,7 +23,10 @@ const roles: { key: RoleKey; label: string }[] = [
   { key: 'techWriter', label: 'Тех.писатель' },
 ];
 
-export const WBSView: React.FC<WBSViewProps> = ({ tasks, parameters, onTaskChange, onRemoveTask, onAddTask }) => {
+export const WBSView: React.FC<WBSViewProps> = ({ tasks, parameters, onTaskChange, onRemoveTask, onAddTask, estimateId }) => {
+  const enabledMapRef = useRef<Record<number, Partial<Record<RoleKey, boolean>>>>({});
+  const saveEstimateTimeouts = useRef<Record<string, any>>({});
+  const saveTaskTimeouts = useRef<Record<number, any>>({});
   const groups = useMemo(() => {
     const m = new Map<string, Task[]>();
     tasks.forEach(t => {
@@ -34,33 +39,96 @@ export const WBSView: React.FC<WBSViewProps> = ({ tasks, parameters, onTaskChang
 
   const updateStageNameForGroup = useCallback((oldStage: string, newStage: string) => {
     tasks.filter(t => t.stage === oldStage).forEach(t => {
-      onTaskChange(t.id, { ...t, stage: newStage });
+      const updated = { ...t, stage: newStage };
+      onTaskChange(t.id, updated);
+      // debounce save
+      if (estimateId && t.id) {
+        if (saveTaskTimeouts.current[t.id]) clearTimeout(saveTaskTimeouts.current[t.id]);
+        saveTaskTimeouts.current[t.id] = setTimeout(async () => {
+          try {
+            const dto = {
+              taskName: updated.name,
+              stageName: updated.stage,
+              category: updated.stage,
+              complexity: updated.isRisk ? 'high' : 'medium',
+              estimatedHours: 0,
+              status: 'planned',
+              priority: 'medium',
+              sortOrder: 0,
+              estimates: [
+                { role: 'analysis', ...updated.estimates.analysis },
+                { role: 'frontDev', ...updated.estimates.frontDev },
+                { role: 'backDev', ...updated.estimates.backDev },
+                { role: 'testing', ...updated.estimates.testing },
+                { role: 'devops', ...updated.estimates.devops },
+                { role: 'design', ...updated.estimates.design },
+                { role: 'techWriter', ...updated.estimates.techWriter },
+              ]
+            };
+            await api.updateTask(estimateId, t.id, dto);
+          } catch (e) {
+            console.error('Failed to save task stage:', e);
+          }
+        }, 800);
+      }
     });
-  }, [tasks, onTaskChange]);
+  }, [tasks, onTaskChange, estimateId]);
 
   const toggleRole = useCallback((task: Task, role: RoleKey, checked: boolean) => {
-    const current = task.estimates[role];
-    const next: Estimate = checked ? current : { min: 0, real: 0, max: 0 };
-    onTaskChange(task.id, {
-      ...task,
-      estimates: {
-        ...task.estimates,
-        [role]: next,
-      },
-    });
-  }, [onTaskChange]);
+    // Track enabled state locally so inputs appear immediately
+    const map = enabledMapRef.current[task.id] || {};
+    map[role] = checked;
+    enabledMapRef.current[task.id] = map;
+    if (!checked) {
+      const next: Estimate = { min: 0, real: 0, max: 0 };
+      const updated = {
+        ...task,
+        estimates: {
+          ...task.estimates,
+          [role]: next,
+        },
+      };
+      onTaskChange(task.id, updated);
+      if (estimateId) {
+        const key = `${task.id}-${role}`;
+        if (saveEstimateTimeouts.current[key]) clearTimeout(saveEstimateTimeouts.current[key]);
+        saveEstimateTimeouts.current[key] = setTimeout(async () => {
+          try {
+            await api.updateTaskEstimate(estimateId, task.id, role, { role, ...next });
+          } catch (e) {
+            console.error('Failed to save estimate:', e);
+          }
+        }, 500);
+      }
+    }
+  }, [onTaskChange, estimateId]);
 
   const handleEstimateChange = useCallback((task: Task, role: RoleKey, field: keyof Estimate, value: number) => {
-    onTaskChange(task.id, {
+    const updated: Task = {
       ...task,
       estimates: {
         ...task.estimates,
         [role]: { ...task.estimates[role], [field]: Math.max(0, value || 0) },
       }
-    });
-  }, [onTaskChange]);
+    };
+    onTaskChange(task.id, updated);
+    if (estimateId) {
+      const key = `${task.id}-${role}`;
+      if (saveEstimateTimeouts.current[key]) clearTimeout(saveEstimateTimeouts.current[key]);
+      const payload = updated.estimates[role];
+      saveEstimateTimeouts.current[key] = setTimeout(async () => {
+        try {
+          await api.updateTaskEstimate(estimateId, task.id, role, { role, ...payload });
+        } catch (e) {
+          console.error('Failed to save estimate:', e);
+        }
+      }, 500);
+    }
+  }, [onTaskChange, estimateId]);
 
   const isRoleEnabled = (task: Task, role: RoleKey) => {
+    const local = enabledMapRef.current[task.id]?.[role];
+    if (typeof local === 'boolean') return local;
     const e = task.estimates[role];
     return (e.min || 0) > 0 || (e.real || 0) > 0 || (e.max || 0) > 0;
   };
@@ -110,7 +178,39 @@ export const WBSView: React.FC<WBSViewProps> = ({ tasks, parameters, onTaskChang
                     <label className="text-sm text-muted-foreground">Функциональное требование</label>
                     <AutoResizeTextarea
                       value={task.name}
-                      onChange={(v) => onTaskChange(task.id, { ...task, name: v })}
+                      onChange={(v) => {
+                        const updated = { ...task, name: v };
+                        onTaskChange(task.id, updated);
+                        if (estimateId && task.id) {
+                          if (saveTaskTimeouts.current[task.id]) clearTimeout(saveTaskTimeouts.current[task.id]);
+                          saveTaskTimeouts.current[task.id] = setTimeout(async () => {
+                            try {
+                              const dto = {
+                                taskName: updated.name,
+                                stageName: updated.stage,
+                                category: updated.stage,
+                                complexity: updated.isRisk ? 'high' : 'medium',
+                                estimatedHours: 0,
+                                status: 'planned',
+                                priority: 'medium',
+                                sortOrder: 0,
+                                estimates: [
+                                  { role: 'analysis', ...updated.estimates.analysis },
+                                  { role: 'frontDev', ...updated.estimates.frontDev },
+                                  { role: 'backDev', ...updated.estimates.backDev },
+                                  { role: 'testing', ...updated.estimates.testing },
+                                  { role: 'devops', ...updated.estimates.devops },
+                                  { role: 'design', ...updated.estimates.design },
+                                  { role: 'techWriter', ...updated.estimates.techWriter },
+                                ]
+                              };
+                              await api.updateTask(estimateId, task.id, dto);
+                            } catch (e) {
+                              console.error('Failed to save task name:', e);
+                            }
+                          }, 800);
+                        }
+                      }}
                       className="w-full bg-input text-foreground rounded p-2 border border-border focus:outline-none focus:ring-2 focus:ring-ring"
                     />
                   </div>
@@ -119,7 +219,39 @@ export const WBSView: React.FC<WBSViewProps> = ({ tasks, parameters, onTaskChang
                       <input
                         type="checkbox"
                         checked={task.isRisk}
-                        onChange={(e) => onTaskChange(task.id, { ...task, isRisk: e.target.checked })}
+                        onChange={(e) => {
+                          const updated = { ...task, isRisk: e.target.checked };
+                          onTaskChange(task.id, updated);
+                          if (estimateId && task.id) {
+                            if (saveTaskTimeouts.current[task.id]) clearTimeout(saveTaskTimeouts.current[task.id]);
+                            saveTaskTimeouts.current[task.id] = setTimeout(async () => {
+                              try {
+                                const dto = {
+                                  taskName: updated.name,
+                                  stageName: updated.stage,
+                                  category: updated.stage,
+                                  complexity: updated.isRisk ? 'high' : 'medium',
+                                  estimatedHours: 0,
+                                  status: 'planned',
+                                  priority: 'medium',
+                                  sortOrder: 0,
+                                  estimates: [
+                                    { role: 'analysis', ...updated.estimates.analysis },
+                                    { role: 'frontDev', ...updated.estimates.frontDev },
+                                    { role: 'backDev', ...updated.estimates.backDev },
+                                    { role: 'testing', ...updated.estimates.testing },
+                                    { role: 'devops', ...updated.estimates.devops },
+                                    { role: 'design', ...updated.estimates.design },
+                                    { role: 'techWriter', ...updated.estimates.techWriter },
+                                  ]
+                                };
+                                await api.updateTask(estimateId, task.id, dto);
+                              } catch (e) {
+                                console.error('Failed to save task risk flag:', e);
+                              }
+                            }, 800);
+                          }
+                        }}
                         className="h-5 w-5 rounded border-border text-primary focus:ring-primary"
                       />
                       <span>Риск</span>
@@ -188,4 +320,3 @@ export const WBSView: React.FC<WBSViewProps> = ({ tasks, parameters, onTaskChang
 };
 
 export default WBSView;
-
