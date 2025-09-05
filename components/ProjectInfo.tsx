@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { ProjectParameters, QualityLevel } from '../types';
 import { QUALITY_LEVELS, BASE_PARAMETER_BENCHMARKS } from '../constants';
 
@@ -148,6 +148,7 @@ const Switch: React.FC<{ checked: boolean; onChange: (checked: boolean) => void;
   );
 
 export const ProjectInfo: React.FC<ProjectInfoProps> = ({ parameters, setParameters, totalHours, totalFTE, projectName, qualityLevel, overheadTotals }) => {
+  const [paramsCollapsed, setParamsCollapsed] = useState(false);
   
   const handleParameterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -196,7 +197,18 @@ export const ProjectInfo: React.FC<ProjectInfoProps> = ({ parameters, setParamet
           </div>
       </div>
 
-      <InfoCard title="Параметры расчета" className="flex-1">
+      <div className="bg-card rounded-lg p-6 shadow-lg flex-1">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-card-foreground">Параметры расчета</h3>
+          <button
+            onClick={() => setParamsCollapsed(c => !c)}
+            className="px-3 py-1 text-sm rounded bg-secondary text-secondary-foreground hover:bg-secondary/80"
+            aria-expanded={!paramsCollapsed}
+          >
+            {paramsCollapsed ? 'Развернуть' : 'Свернуть'}
+          </button>
+        </div>
+        {!paramsCollapsed && (
         <div className="space-y-2 divide-y divide-border">
             <ParameterRow
               label="Риски"
@@ -284,7 +296,8 @@ export const ProjectInfo: React.FC<ProjectInfoProps> = ({ parameters, setParamet
                 </div>
             </div>
         </div>
-      </InfoCard>
+        )}
+      </div>
     </div>
   );
 };

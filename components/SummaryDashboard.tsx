@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { RoleAnalyticsTable } from './RoleAnalyticsTable';
 import { DistributionChart } from './DistributionChart';
 import type { RoleAnalytics } from '../types';
@@ -9,9 +9,20 @@ interface SummaryDashboardProps {
 }
 
 export const SummaryDashboard: React.FC<SummaryDashboardProps> = ({ data }) => {
+    const [collapsed, setCollapsed] = useState(false);
     return (
         <div className="bg-card rounded-lg p-6 shadow-lg h-full">
-            <h3 className="text-lg font-bold text-card-foreground mb-4">Аналитика по ролям</h3>
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-card-foreground">Аналитика по ролям</h3>
+                <button
+                    onClick={() => setCollapsed(c => !c)}
+                    className="px-3 py-1 text-sm rounded bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                    aria-expanded={!collapsed}
+                >
+                    {collapsed ? 'Развернуть' : 'Свернуть'}
+                </button>
+            </div>
+            {!collapsed && (
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                 <div className="overflow-x-auto">
                     <RoleAnalyticsTable data={data} />
@@ -20,6 +31,7 @@ export const SummaryDashboard: React.FC<SummaryDashboardProps> = ({ data }) => {
                     <DistributionChart data={data} />
                 </div>
             </div>
+            )}
         </div>
     );
 };
