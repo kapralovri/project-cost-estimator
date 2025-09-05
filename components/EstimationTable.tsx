@@ -5,6 +5,7 @@ import { EstimationTableRow } from './EstimationTableRow';
 import { PlusIcon, ExpandIcon, CollapseIcon, ImportIcon } from './icons';
 import { Spinner } from './Spinner';
 import { importExcelFromBackend } from '../api';
+import { WBSView } from './WBSView';
 
 // Make XLSX available from the script loaded in index.html
 declare var XLSX: any;
@@ -14,7 +15,7 @@ interface EstimationTableProps {
   parameters: ProjectParameters;
   estimateId?: number;
   onTaskChange: (id: number, updatedTask: Task) => void;
-  onAddTask: () => void;
+  onAddTask: (stage?: string) => void;
   onRemoveTask: (id: number) => void;
   onImportTasks: (tasks: Task[]) => void;
   isFullscreen: boolean;
@@ -44,6 +45,7 @@ const roleEstimateGroups: { name: string, key: RoleKey }[] = [
 export const EstimationTable: React.FC<EstimationTableProps> = ({ tasks, parameters, estimateId, onTaskChange, onAddTask, onRemoveTask, onImportTasks, isFullscreen, toggleFullscreen }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [isWBS, setIsWBS] = useState(false);
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
@@ -85,6 +87,12 @@ export const EstimationTable: React.FC<EstimationTableProps> = ({ tasks, paramet
                 accept=".xlsx, .xls"
               />
               <button
+                onClick={() => setIsWBS(v => !v)}
+                className={`px-3 py-1 rounded text-sm ${isWBS ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}
+              >
+                WBS
+              </button>
+              <button
                 onClick={handleImportClick}
                 disabled={isImporting}
                 className="p-2 rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
@@ -101,6 +109,7 @@ export const EstimationTable: React.FC<EstimationTableProps> = ({ tasks, paramet
               </button>
             </div>
         </div>
+      {!isWBS && (
       <div className="overflow-auto flex-grow">
         <table className="w-full min-w-max text-sm text-left">
           <thead className="text-xs text-muted-foreground uppercase bg-secondary/70 sticky top-0 z-30">
@@ -146,14 +155,36 @@ export const EstimationTable: React.FC<EstimationTableProps> = ({ tasks, paramet
           </tbody>
         </table>
       </div>
+      )}
+      {isWBS && (
+        <div className="flex-grow overflow-auto">
+          <WBSView
+            tasks={tasks}
+            parameters={parameters}
+            onTaskChange={onTaskChange}
+            onRemoveTask={onRemoveTask}
+            onAddTask={onAddTask}
+          />
+        </div>
+      )}
       <div className="p-4 flex justify-start items-center space-x-4 border-t border-border">
-        <button
-          onClick={onAddTask}
-          className="flex items-center space-x-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background transition-colors"
-        >
-          <PlusIcon />
-          <span>Добавить задачу</span>
-        </button>
+        {!isWBS ? (
+          <button
+            onClick={() => onAddTask()}
+            className="flex items-center space-x-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background transition-colors"
+          >
+            <PlusIcon />
+            <span>Добавить задачу</span>
+          </button>
+        ) : (
+          <button
+            onClick={() => onAddTask()}
+            className="flex items-center space-x-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background transition-colors"
+          >
+            <PlusIcon />
+            <span>Добавить этап</span>
+          </button>
+        )}
       </div>
     </div>
     </>

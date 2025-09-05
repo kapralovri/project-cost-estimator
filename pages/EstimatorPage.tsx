@@ -22,14 +22,14 @@ export const EstimatorPage: React.FC<EstimatorPageProps> = ({ project, onSave, o
     setTasks(currentTasks => currentTasks.map(task => task.id === id ? updatedTask : task));
   }, []);
 
-  const handleAddTask = useCallback(async () => {
+  const handleAddTask = useCallback(async (stageOverride?: string) => {
     // Автосохранение новой задачи в БД
     if (project.backendId) {
       try {
         const taskDto = {
           taskName: 'Новая задача',
-          stageName: 'Новый этап',
-          category: 'Новый этап',
+          stageName: stageOverride || 'Новый этап',
+          category: stageOverride || 'Новый этап',
           complexity: 'medium',
           estimatedHours: 0,
           status: 'planned',
@@ -57,7 +57,7 @@ export const EstimatorPage: React.FC<EstimatorPageProps> = ({ project, onSave, o
         const newTask: Task = {
           id: savedTask.id, // ID из backend
           name: savedTask.taskName,
-          stage: savedTask.stageName || savedTask.category || 'Новый этап',
+          stage: savedTask.stageName || savedTask.category || stageOverride || 'Новый этап',
           isRisk: savedTask.complexity === 'high',
           estimates: {
             analysis: { min: 0, real: 0, max: 0 },
@@ -79,7 +79,7 @@ export const EstimatorPage: React.FC<EstimatorPageProps> = ({ project, onSave, o
       const newTask: Task = {
         id: Date.now(),
         name: 'Новая задача',
-        stage: 'Новый этап',
+        stage: stageOverride || 'Новый этап',
         isRisk: false,
         estimates: {
           analysis: { min: 0, real: 0, max: 0 },

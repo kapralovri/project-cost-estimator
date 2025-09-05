@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { RegistryPage } from './pages/RegistryPage';
 import { EstimatorPage } from './pages/EstimatorPage';
 import { CreateEstimateModal } from './components/CreateEstimateModal';
-import type { EstimateProject, QualityLevel, Task, ProjectParameters, Estimate, ApiEstimate, ApiParameter, ApiTask } from './types';
+import type { EstimateProject, QualityLevel, Task, ProjectParameters, Estimate, ApiEstimate, ApiParameter, ApiTask, RoleKey } from './types';
 import { QUALITY_LEVELS, DEFAULT_PROJECT_PARAMETERS } from './constants';
 import { api, BackendEstimateDto, BackendParameterDto, BackendTaskDto, BackendTaskEstimateDto } from './api';
 
@@ -195,6 +195,19 @@ const App: React.FC = () => {
         setSelectedProjectId(null);
     }, []);
 
+    const handleDeleteProject = useCallback(async (id: string) => {
+        try {
+            const project = projects.find(p => p.id === id);
+            if (project?.backendId) {
+                await api.deleteEstimate(project.backendId);
+            }
+            setProjects(prev => prev.filter(p => p.id !== id));
+            if (selectedProjectId === id) setSelectedProjectId(null);
+        } catch (error) {
+            console.error('Failed to delete project:', error);
+        }
+    }, [projects, selectedProjectId]);
+
     const handleSaveProject = useCallback(async (
         projectId: string, 
         updatedData: { tasks: Task[], parameters: ProjectParameters, totalHours: number }
@@ -329,6 +342,7 @@ const App: React.FC = () => {
                 projects={projectsWithTotals}
                 onSelectProject={handleSelectProject}
                 onCreateNew={handleCreateNew}
+                onDeleteProject={handleDeleteProject}
             />
             {isCreateModalOpen && (
                 <CreateEstimateModal
