@@ -202,7 +202,7 @@ export const EstimationTableRow: React.FC<EstimationTableRowProps> = ({ task, pa
         const total = base + risk + general + management;
         
         return {
-            baseEstimate: Math.round(base),
+            baseEstimate: Math.round(base + risk),
             riskHours: Math.round(risk),
             generalHours: Math.round(general),
             managementHours: Math.round(management),
