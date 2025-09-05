@@ -27,6 +27,7 @@ export const WBSView: React.FC<WBSViewProps> = ({ tasks, parameters, onTaskChang
   const enabledMapRef = useRef<Record<number, Partial<Record<RoleKey, boolean>>>>({});
   const saveEstimateTimeouts = useRef<Record<string, any>>({});
   const saveTaskTimeouts = useRef<Record<number, any>>({});
+  const [collapsedRoles, setCollapsedRoles] = useState(false);
   const groups = useMemo(() => {
     const m = new Map<string, Task[]>();
     tasks.forEach(t => {
@@ -133,15 +134,33 @@ export const WBSView: React.FC<WBSViewProps> = ({ tasks, parameters, onTaskChang
     return (e.min || 0) > 0 || (e.real || 0) > 0 || (e.max || 0) > 0;
   };
 
+  const pert = (e: Estimate) => (e.min + 4 * e.real + e.max) / 6;
+  const computeBO = (task: Task) => {
+    const get = (role: RoleKey) => (task.isRisk ? task.estimates[role].max : pert(task.estimates[role])) || 0;
+    const front = get('frontDev');
+    const back = get('backDev');
+    const testing = parameters.isManualTesting ? get('testing') : (front + back) * (parameters.testing / 100);
+    const base = get('analysis') + front + back + get('devops') + get('design') + get('techWriter') + testing;
+    const risk = base * (parameters.risks / 100);
+    const bo = Math.round(base + risk);
+    return bo;
+  };
+
   return (
     <div className="p-4 space-y-6">
-      <div className="flex justify-start">
+      <div className="flex justify-between items-center">
         <button
           onClick={() => onAddTask()}
           className="flex items-center space-x-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring"
         >
           <PlusIcon />
           <span>Добавить этап</span>
+        </button>
+        <button
+          onClick={() => setCollapsedRoles(c => !c)}
+          className="px-3 py-2 rounded bg-secondary text-secondary-foreground hover:bg-secondary/80"
+        >
+          {collapsedRoles ? 'Развернуть роли' : 'Свернуть роли'}
         </button>
       </div>
 
@@ -215,6 +234,7 @@ export const WBSView: React.FC<WBSViewProps> = ({ tasks, parameters, onTaskChang
                     />
                   </div>
                   <div className="flex items-center space-x-4">
+                    <div className="px-2 py-1 rounded bg-primary/10 text-primary font-semibold">БО: {computeBO(task)}</div>
                     <label className="inline-flex items-center space-x-2">
                       <input
                         type="checkbox"
@@ -262,6 +282,7 @@ export const WBSView: React.FC<WBSViewProps> = ({ tasks, parameters, onTaskChang
                   </div>
                 </div>
 
+                {!collapsedRoles && (
                 <div className="mt-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {roles.map(r => {
                     const enabled = isRoleEnabled(task, r.key);
@@ -310,6 +331,7 @@ export const WBSView: React.FC<WBSViewProps> = ({ tasks, parameters, onTaskChang
                     );
                   })}
                 </div>
+                )}
               </div>
             ))}
           </div>
