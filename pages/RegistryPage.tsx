@@ -43,7 +43,15 @@ export const RegistryPage: React.FC<RegistryPageProps> = ({ projects, onSelectPr
               <tbody>
                 {projects.map((project) => (
                   <tr key={project.id} className="border-b border-border hover:bg-secondary/50">
-                    <th scope="row" className="px-6 py-4 font-medium text-primary hover:underline whitespace-nowrap">{project.name}</th>
+                    <th scope="row" className="px-6 py-4 font-medium whitespace-nowrap">
+                      <a
+                        href="#"
+                        onClick={(e) => { e.preventDefault(); onSelectProject(project.id); }}
+                        className="text-primary hover:underline"
+                      >
+                        {project.name}
+                      </a>
+                    </th>
                     <td className="px-6 py-4 text-muted-foreground">{new Date(project.createdAt).toLocaleDateString()}</td>
                     <td className="px-6 py-4 text-right font-semibold text-card-foreground">{project.totalHours.toLocaleString()}</td>
                     <td className="px-6 py-4">
