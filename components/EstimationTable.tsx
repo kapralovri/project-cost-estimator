@@ -1,5 +1,5 @@
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useMemo } from 'react';
 import type { Task, ProjectParameters, Estimate, RoleKey } from '../types';
 import { EstimationTableRow } from './EstimationTableRow';
 import { PlusIcon, ExpandIcon, CollapseIcon, ImportIcon } from './icons';
@@ -14,6 +14,7 @@ interface EstimationTableProps {
   tasks: Task[];
   parameters: ProjectParameters;
   estimateId?: number;
+  enabledRoles?: RoleKey[];
   onTaskChange: (id: number, updatedTask: Task) => void;
   onAddTask: (stage?: string) => void;
   onRemoveTask: (id: number) => void;
@@ -22,30 +23,25 @@ interface EstimationTableProps {
   toggleFullscreen: () => void;
 }
 
-const estimateGroups = [
-  { name: 'Анализ + документирование', keys: ['analysis'] },
-  { name: 'Front Dev', keys: ['frontDev'] },
-  { name: 'Back Dev', keys: ['backDev'] },
-  { name: 'Тестирование', keys: ['testing'] },
-  { name: 'Devops', keys: ['devops'] },
-  { name: 'Дизайнер', keys: ['design'] },
-  { name: 'Технические писатели', keys: ['techWriter'] },
-];
+const ROLE_LABELS: Record<RoleKey, string> = {
+  analysis: 'Аналитик',
+  architect: 'Архитектор',
+  frontDev: 'Front Dev',
+  backDev: 'Back Dev',
+  testing: 'Тестирование',
+  devops: 'Devops',
+  design: 'Дизайнер',
+  techWriter: 'Тех. писатель',
+  adminTrack: 'Админ форм. трека',
+  stp: 'СТП',
+};
 
-const roleEstimateGroups: { name: string, key: RoleKey }[] = [
-    { name: 'Анализ', key: 'analysis' },
-    { name: 'Front Dev', key: 'frontDev' },
-    { name: 'Back Dev', key: 'backDev' },
-    { name: 'Тестирование', key: 'testing' },
-    { name: 'Devops', key: 'devops' },
-    { name: 'Дизайнер', key: 'design' },
-    { name: 'Технические писатели', key: 'techWriter' },
-];
-
-export const EstimationTable: React.FC<EstimationTableProps> = ({ tasks, parameters, estimateId, onTaskChange, onAddTask, onRemoveTask, onImportTasks, isFullscreen, toggleFullscreen }) => {
+export const EstimationTable: React.FC<EstimationTableProps> = ({ tasks, parameters, estimateId, enabledRoles, onTaskChange, onAddTask, onRemoveTask, onImportTasks, isFullscreen, toggleFullscreen }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [isWBS, setIsWBS] = useState(false);
+
+  const activeRoles = useMemo<RoleKey[]>(() => enabledRoles && enabledRoles.length ? enabledRoles : ['analysis','architect','frontDev','backDev','testing','devops','design','techWriter','adminTrack','stp'] as RoleKey[], [enabledRoles]);
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
@@ -118,8 +114,9 @@ export const EstimationTable: React.FC<EstimationTableProps> = ({ tasks, paramet
               <th scope="col" className="px-3 py-3 min-w-[150px] sticky left-12 bg-secondary/50 z-20">Этап, Модуль</th>
               <th scope="col" className="px-3 py-3 min-w-[200px] sticky left-[210px] bg-secondary/50 z-20">Функциональное требование</th>
               <th scope="col" className="px-3 py-3 w-20 text-center sticky left-[410px] bg-secondary/50 z-20">Риск</th>
-              {estimateGroups.map(group => (
-                <th key={group.name} colSpan={4} className="px-3 py-3 text-center border-l border-r border-border">{group.name}</th>
+              <th scope="col" className="px-3 py-3 w-24 text-center">Факт</th>
+              {activeRoles.map(role => (
+                <th key={role} colSpan={4} className="px-3 py-3 text-center border-l border-r border-border">{ROLE_LABELS[role]}</th>
               ))}
               <th colSpan={5} className="px-3 py-3 text-center border-l border-border">Итоги по задаче</th>
             </tr>
@@ -128,11 +125,12 @@ export const EstimationTable: React.FC<EstimationTableProps> = ({ tasks, paramet
               <th className="px-3 py-3 sticky left-12 bg-secondary/50 z-20"></th>
               <th className="px-3 py-3 sticky left-[210px] bg-secondary/50 z-20"></th>
               <th className="px-3 py-3 sticky left-[410px] bg-secondary/50 z-20"></th>
-              {estimateGroups.flatMap(group => [
-                  <th key={`${group.name}-min`} className="px-2 py-3 text-center border-l border-border">Мин</th>,
-                  <th key={`${group.name}-real`} className="px-2 py-3 text-center">Реал</th>,
-                  <th key={`${group.name}-max`} className="px-2 py-3 text-center">Макс</th>,
-                  <th key={`${group.name}-pert`} className="px-2 py-3 text-center font-bold bg-secondary/70 border-r border-border">Pert</th>
+              <th className="px-3 py-3"></th>
+              {activeRoles.flatMap(role => [
+                  <th key={`${role}-min`} className="px-2 py-3 text-center border-l border-border">Мин</th>,
+                  <th key={`${role}-real`} className="px-2 py-3 text-center">Реал</th>,
+                  <th key={`${role}-max`} className="px-2 py-3 text-center">Макс</th>,
+                  <th key={`${role}-pert`} className="px-2 py-3 text-center font-bold bg-secondary/70 border-r border-border">Pert</th>
               ])}
               <th className="px-2 py-3 text-center border-l border-border">Риски</th>
               <th className="px-2 py-3 text-center">Общие</th>
@@ -148,6 +146,7 @@ export const EstimationTable: React.FC<EstimationTableProps> = ({ tasks, paramet
                 task={task}
                 parameters={parameters}
                 estimateId={estimateId}
+                enabledRoles={activeRoles}
                 onTaskChange={onTaskChange}
                 onRemoveTask={onRemoveTask}
               />

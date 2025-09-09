@@ -3,7 +3,7 @@ import { RegistryPage } from './pages/RegistryPage';
 import { EstimatorPage } from './pages/EstimatorPage';
 import { CreateEstimateModal } from './components/CreateEstimateModal';
 import type { EstimateProject, QualityLevel, Task, ProjectParameters, Estimate, ApiEstimate, ApiParameter, ApiTask, RoleKey } from './types';
-import { QUALITY_LEVELS, DEFAULT_PROJECT_PARAMETERS } from './constants';
+import { QUALITY_LEVELS, DEFAULT_PROJECT_PARAMETERS, DEFAULT_ENABLED_ROLES } from './constants';
 import { api, BackendEstimateDto, BackendParameterDto, BackendTaskDto, BackendTaskEstimateDto } from './api';
 
 const App: React.FC = () => {
@@ -36,6 +36,7 @@ const App: React.FC = () => {
                         testing: parseFloat(paramMap.get('testing') || '0'),
                         testingComment: paramMap.get('testingComment') || '',
                         isManualTesting: paramMap.get('isManualTesting') === 'true',
+                        isManualAdjust: paramMap.get('isManualAdjust') === 'true',
                         general: parseFloat(paramMap.get('general') || '0'),
                         generalComment: paramMap.get('generalComment') || '',
                         vacation: parseFloat(paramMap.get('vacation') || '0'),
@@ -52,6 +53,7 @@ const App: React.FC = () => {
                         managementComment: '',
                         generalComment: '',
                         isManualTesting: false,
+                        isManualAdjust: false,
                     };
                 }
 
@@ -61,13 +63,16 @@ const App: React.FC = () => {
                         // Восстанавливаем оценки из API
                         const estimates = {
                             analysis: { min: 0, real: 0, max: 0 },
+                            architect: { min: 0, real: 0, max: 0 },
                             frontDev: { min: 0, real: 0, max: 0 },
                             backDev: { min: 0, real: 0, max: 0 },
                             testing: { min: 0, real: 0, max: 0 },
                             devops: { min: 0, real: 0, max: 0 },
                             design: { min: 0, real: 0, max: 0 },
                             techWriter: { min: 0, real: 0, max: 0 },
-                        };
+                            adminTrack: { min: 0, real: 0, max: 0 },
+                            stp: { min: 0, real: 0, max: 0 },
+                        } as any;
 
                         // Если есть оценки в API, восстанавливаем их
                         if (task.estimates && task.estimates.length > 0) {
@@ -98,6 +103,11 @@ const App: React.FC = () => {
                     qualityLevel = e.qualityLevel as QualityLevel;
                 }
 
+                const enabledRolesParam = e.parameters?.find(p => p.name === 'enabledRoles')?.value || '';
+                const enabledRoles = enabledRolesParam
+                  ? (enabledRolesParam.split(',').map(s => s.trim()).filter(Boolean) as RoleKey[])
+                  : DEFAULT_ENABLED_ROLES;
+
                 return {
                     backendId: e.id,
                     id: `proj-${e.id}`,
@@ -107,6 +117,7 @@ const App: React.FC = () => {
                     qualityLevel,
                     parameters,
                     tasks,
+                    enabledRoles,
                 };
             });
             setProjects(mapped);
@@ -121,7 +132,7 @@ const App: React.FC = () => {
         setCreateModalOpen(true);
     }, []);
 
-    const handleCreateProject = useCallback(async (name: string, qualityLevel: QualityLevel) => {
+    const handleCreateProject = useCallback(async (name: string, qualityLevel: QualityLevel, enabledRoles: RoleKey[]) => {
         try {
             const baseParams = DEFAULT_PROJECT_PARAMETERS;
             const general = baseParams.vacation + baseParams.sick_leave + baseParams.meetings + baseParams.onboarding;
@@ -135,6 +146,7 @@ const App: React.FC = () => {
                 managementComment: '',
                 generalComment: '',
                 isManualTesting: false,
+                isManualAdjust: false,
             };
 
             // Создаем параметры для API
@@ -146,12 +158,14 @@ const App: React.FC = () => {
                 { name: 'testing', value: parameters.testing.toString(), type: 'number' },
                 { name: 'testingComment', value: parameters.testingComment || '', type: 'string' },
                 { name: 'isManualTesting', value: parameters.isManualTesting?.toString() || 'false', type: 'boolean' },
+                { name: 'isManualAdjust', value: parameters.isManualAdjust?.toString() || 'false', type: 'boolean' },
                 { name: 'general', value: parameters.general.toString(), type: 'number' },
                 { name: 'generalComment', value: parameters.generalComment || '', type: 'string' },
                 { name: 'vacation', value: parameters.vacation.toString(), type: 'number' },
                 { name: 'sick_leave', value: parameters.sick_leave.toString(), type: 'number' },
                 { name: 'meetings', value: parameters.meetings.toString(), type: 'number' },
                 { name: 'onboarding', value: parameters.onboarding.toString(), type: 'number' },
+                { name: 'enabledRoles', value: enabledRoles.join(','), type: 'string' },
             ];
 
             const dto: BackendEstimateDto = {
@@ -176,6 +190,7 @@ const App: React.FC = () => {
                 status: 'Актуальный',
                 qualityLevel,
                 parameters,
+                enabledRoles,
                 tasks: [],
             };
             
@@ -210,7 +225,7 @@ const App: React.FC = () => {
 
     const handleSaveProject = useCallback(async (
         projectId: string, 
-        updatedData: { tasks: Task[], parameters: ProjectParameters, totalHours: number }
+        updatedData: { tasks: Task[], parameters: ProjectParameters, totalHours: number, enabledRoles?: RoleKey[] }
     ) => {
         try {
             const project = projects.find(p => p.id === projectId);
@@ -219,7 +234,7 @@ const App: React.FC = () => {
             // Update local state immediately for better UX
             setProjects(prev => prev.map(p => {
                 if (p.id === projectId) {
-                    return { ...p, tasks: updatedData.tasks, parameters: updatedData.parameters };
+                    return { ...p, tasks: updatedData.tasks, parameters: updatedData.parameters, enabledRoles: updatedData.enabledRoles ?? p.enabledRoles };
                 }
                 return p;
             }));
@@ -233,12 +248,14 @@ const App: React.FC = () => {
                 { name: 'testing', value: updatedData.parameters.testing.toString(), type: 'number' },
                 { name: 'testingComment', value: updatedData.parameters.testingComment || '', type: 'string' },
                 { name: 'isManualTesting', value: updatedData.parameters.isManualTesting?.toString() || 'false', type: 'boolean' },
+                { name: 'isManualAdjust', value: updatedData.parameters.isManualAdjust?.toString() || 'false', type: 'boolean' },
                 { name: 'general', value: updatedData.parameters.general.toString(), type: 'number' },
                 { name: 'generalComment', value: updatedData.parameters.generalComment || '', type: 'string' },
                 { name: 'vacation', value: updatedData.parameters.vacation.toString(), type: 'number' },
                 { name: 'sick_leave', value: updatedData.parameters.sick_leave.toString(), type: 'number' },
                 { name: 'meetings', value: updatedData.parameters.meetings.toString(), type: 'number' },
                 { name: 'onboarding', value: updatedData.parameters.onboarding.toString(), type: 'number' },
+                { name: 'enabledRoles', value: ((updatedData.enabledRoles && updatedData.enabledRoles.length ? updatedData.enabledRoles : (project?.enabledRoles && project.enabledRoles.length ? project.enabledRoles : DEFAULT_ENABLED_ROLES)) as RoleKey[]).join(','), type: 'string' },
             ];
 
             // Создаем задачи для API
@@ -246,12 +263,15 @@ const App: React.FC = () => {
                 // Преобразуем оценки задач в формат API
                 const estimates: BackendTaskEstimateDto[] = [
                     { role: 'analysis', ...task.estimates.analysis },
+                    { role: 'architect', ...task.estimates.architect },
                     { role: 'frontDev', ...task.estimates.frontDev },
                     { role: 'backDev', ...task.estimates.backDev },
                     { role: 'testing', ...task.estimates.testing },
                     { role: 'devops', ...task.estimates.devops },
                     { role: 'design', ...task.estimates.design },
                     { role: 'techWriter', ...task.estimates.techWriter },
+                    { role: 'adminTrack', ...task.estimates.adminTrack },
+                    { role: 'stp', ...task.estimates.stp },
                 ];
 
                 return {
@@ -293,17 +313,27 @@ const App: React.FC = () => {
     const projectsWithTotals = useMemo(() => {
         return projects.map(p => {
             const isManualTesting = !!p.parameters.isManualTesting;
+            const enabled = p.enabledRoles && p.enabledRoles.length ? p.enabledRoles : DEFAULT_ENABLED_ROLES;
             const totalHours = p.tasks.reduce((sum, task) => {
-                const getRoleHours = (role: RoleKey) => task.isRisk ? task.estimates[role].max : pert(task.estimates[role]);
-                const analysis = getRoleHours('analysis');
-                const frontDev = getRoleHours('frontDev');
-                const backDev = getRoleHours('backDev');
-                const devops = getRoleHours('devops');
-                const design = getRoleHours('design');
-                const techWriter = getRoleHours('techWriter');
-                const testing = isManualTesting ? getRoleHours('testing') : (frontDev + backDev) * (p.parameters.testing / 100);
+                const getRoleHours = (role: RoleKey) => {
+                    if (task.isActual) {
+                        return task.estimates[role]?.real ?? 0;
+                    }
+                    return task.isRisk ? (task.estimates[role]?.max ?? 0) : pert(task.estimates[role] ?? { min: 0, real: 0, max: 0 });
+                };
 
-                const base = analysis + frontDev + backDev + devops + design + techWriter + testing;
+                let base = 0;
+                enabled.forEach(role => {
+                    if (role === 'testing') {
+                        const frontDev = getRoleHours('frontDev');
+                        const backDev = getRoleHours('backDev');
+                        const testing = isManualTesting ? getRoleHours('testing') : (frontDev + backDev) * (p.parameters.testing / 100);
+                        base += testing;
+                    } else {
+                        base += getRoleHours(role);
+                    }
+                });
+
                 const risk = base * (p.parameters.risks / 100);
                 const general = (base + risk) * (p.parameters.general / 100);
                 const management = (base + risk + general) * (p.parameters.management / 100);

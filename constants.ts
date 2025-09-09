@@ -1,5 +1,5 @@
 
-import type { QualityLevel, ProjectParameters } from './types';
+import type { QualityLevel, ProjectParameters, RoleKey } from './types';
 
 export const QUALITY_LEVELS: Record<QualityLevel, { name: string; parameters: Omit<ProjectParameters, 'general' | 'testingComment' | 'risksComment' | 'managementComment' | 'generalComment'> }> = {
     low: {
@@ -67,3 +67,19 @@ export const DEFAULT_PROJECT_PARAMETERS: Omit<ProjectParameters, 'general' | 'te
     meetings: 5,
     onboarding: 2,
 };
+
+// Полный справочник ролей с локализованными названиями
+export const ALL_ROLES: { key: RoleKey; name: string }[] = [
+  { key: 'analysis', name: 'Аналитик' },
+  { key: 'architect', name: 'Архитектор' },
+  { key: 'frontDev', name: 'Разработчик Front' },
+  { key: 'backDev', name: 'Разработчик Back' },
+  { key: 'testing', name: 'QA' },
+  { key: 'devops', name: 'Devops' },
+  { key: 'techWriter', name: 'Технический писатель' },
+  { key: 'adminTrack', name: 'Администратор форм. трека' },
+  { key: 'design', name: 'Дизайнер' },
+  { key: 'stp', name: 'СТП' },
+];
+
+export const DEFAULT_ENABLED_ROLES: RoleKey[] = ALL_ROLES.map(r => r.key);

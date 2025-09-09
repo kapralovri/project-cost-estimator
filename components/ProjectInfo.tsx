@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import type { ProjectParameters, QualityLevel } from '../types';
-import { QUALITY_LEVELS, BASE_PARAMETER_BENCHMARKS } from '../constants';
+import type { ProjectParameters, QualityLevel, RoleKey } from '../types';
+import { QUALITY_LEVELS, BASE_PARAMETER_BENCHMARKS, ALL_ROLES } from '../constants';
 
 interface ProjectInfoProps {
   parameters: ProjectParameters;
   setParameters: React.Dispatch<React.SetStateAction<ProjectParameters>>;
+  enabledRoles: RoleKey[];
+  setEnabledRoles: React.Dispatch<React.SetStateAction<RoleKey[]>>;
   totalHours: number;
   totalFTE: number;
   projectName: string;
@@ -33,7 +35,8 @@ const ParameterInput: React.FC<{
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; 
   name: string; 
   hours: number;
-}> = ({ label, value, onChange, name, hours }) => (
+  highlight?: boolean;
+}> = ({ label, value, onChange, name, hours, highlight }) => (
   <div className="flex items-center justify-between py-2">
     <label htmlFor={name} className="text-sm text-muted-foreground">{label}</label>
     <div className="flex items-center space-x-2">
@@ -49,7 +52,7 @@ const ParameterInput: React.FC<{
           name={name}
           value={value}
           onChange={onChange}
-          className="w-20 bg-input text-foreground text-right rounded-md p-1 border border-border focus:outline-none focus:ring-2 focus:ring-ring"
+          className={`w-20 bg-input text-foreground text-right rounded-md p-1 border focus:outline-none focus:ring-2 focus:ring-ring ${highlight ? 'border-destructive text-destructive' : 'border-border'}`}
         />
         <span className="ml-2 w-[11px] text-muted-foreground">%</span>
       </div>
@@ -67,7 +70,8 @@ const ParameterRow: React.FC<{
   onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
   hours?: number;
   isReadOnly?: boolean;
-}> = ({ label, name, value, baseValue, comment, commentName, onChange, hours, isReadOnly = false }) => {
+  highlight?: boolean;
+}> = ({ label, name, value, baseValue, comment, commentName, onChange, hours, isReadOnly = false, highlight }) => {
   const deviation = value - baseValue;
 
   return (
@@ -91,7 +95,7 @@ const ParameterRow: React.FC<{
 
           <div className="flex items-center">
             {isReadOnly ? (
-              <span className="w-20 font-bold text-card-foreground text-right p-1">{value}%</span>
+              <span className={`w-20 font-bold text-right p-1 ${highlight ? 'text-destructive' : 'text-card-foreground'}`}>{value}%</span>
             ) : (
               <input
                 type="number"
@@ -99,7 +103,7 @@ const ParameterRow: React.FC<{
                 name={name}
                 value={value}
                 onChange={onChange}
-                className="w-20 bg-input text-foreground text-right rounded-md p-1 border border-border focus:outline-none focus:ring-2 focus:ring-ring"
+                className={`w-20 bg-input text-right rounded-md p-1 border focus:outline-none focus:ring-2 focus:ring-ring ${highlight ? 'border-destructive text-destructive' : 'border-border text-foreground'}`}
               />
             )}
             <span className="ml-2 w-[11px] text-muted-foreground">{!isReadOnly && '%'}</span>
@@ -147,8 +151,9 @@ const Switch: React.FC<{ checked: boolean; onChange: (checked: boolean) => void;
     </div>
   );
 
-export const ProjectInfo: React.FC<ProjectInfoProps> = ({ parameters, setParameters, totalHours, totalFTE, projectName, qualityLevel, overheadTotals }) => {
+export const ProjectInfo: React.FC<ProjectInfoProps> = ({ parameters, setParameters, enabledRoles, setEnabledRoles, totalHours, totalFTE, projectName, qualityLevel, overheadTotals }) => {
   const [paramsCollapsed, setParamsCollapsed] = useState(false);
+  const [baseline] = useState<ProjectParameters>(() => JSON.parse(JSON.stringify(parameters)));
   
   const handleParameterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -166,6 +171,10 @@ export const ProjectInfo: React.FC<ProjectInfoProps> = ({ parameters, setParamet
   
   const handleSwitchChange = (name: string, checked: boolean) => {
     setParameters(prev => ({ ...prev, [name]: checked }));
+  };
+
+  const toggleRole = (key: RoleKey, checked: boolean) => {
+    setEnabledRoles(prev => checked ? Array.from(new Set([...prev, key])) : prev.filter(k => k !== key));
   };
 
   const testingDeviation = parameters.testing - QUALITY_LEVELS[qualityLevel].parameters.testing;
@@ -197,16 +206,43 @@ export const ProjectInfo: React.FC<ProjectInfoProps> = ({ parameters, setParamet
           </div>
       </div>
 
+      <InfoCard title="Роли в оценке" className="flex-shrink-0">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-auto">
+          {ALL_ROLES.map(r => (
+            <label key={r.key} className="flex items-center space-x-2 text-sm">
+              <input
+                type="checkbox"
+                checked={enabledRoles.includes(r.key)}
+                onChange={(e) => toggleRole(r.key, e.target.checked)}
+                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+              />
+              <span>{r.name}</span>
+            </label>
+          ))}
+        </div>
+      </InfoCard>
+
       <div className="bg-card rounded-lg p-6 shadow-lg flex-1">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-card-foreground">Параметры расчета</h3>
-          <button
-            onClick={() => setParamsCollapsed(c => !c)}
-            className="px-3 py-1 text-sm rounded bg-secondary text-secondary-foreground hover:bg-secondary/80"
-            aria-expanded={!paramsCollapsed}
-          >
-            {paramsCollapsed ? 'Развернуть' : 'Свернуть'}
-          </button>
+          <div className="flex items-center gap-4">
+            <label className="flex items-center text-sm text-muted-foreground gap-2">
+              <input
+                type="checkbox"
+                checked={!!parameters.isManualAdjust}
+                onChange={(e) => handleSwitchChange('isManualAdjust', e.target.checked)}
+                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+              />
+              Ручная корректировка
+            </label>
+            <button
+              onClick={() => setParamsCollapsed(c => !c)}
+              className="px-3 py-1 text-sm rounded bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              aria-expanded={!paramsCollapsed}
+            >
+              {paramsCollapsed ? 'Развернуть' : 'Свернуть'}
+            </button>
+          </div>
         </div>
         {!paramsCollapsed && (
         <div className="space-y-2 divide-y divide-border">
@@ -219,6 +255,7 @@ export const ProjectInfo: React.FC<ProjectInfoProps> = ({ parameters, setParamet
               comment={parameters.risksComment}
               commentName="risksComment"
               onChange={handleParameterChange}
+              highlight={!!parameters.isManualAdjust && parameters.risks !== baseline.risks}
             />
             <ParameterRow
               label="Управленческие расходы"
@@ -229,6 +266,7 @@ export const ProjectInfo: React.FC<ProjectInfoProps> = ({ parameters, setParamet
               comment={parameters.managementComment}
               commentName="managementComment"
               onChange={handleParameterChange}
+              highlight={!!parameters.isManualAdjust && parameters.management !== baseline.management}
             />
             <div className="pt-2">
                 <div className="flex items-center justify-between">
@@ -256,7 +294,7 @@ export const ProjectInfo: React.FC<ProjectInfoProps> = ({ parameters, setParamet
                         value={parameters.testing}
                         onChange={handleParameterChange}
                         disabled={parameters.isManualTesting}
-                        className="w-20 bg-input text-foreground text-right rounded-md p-1 border border-border focus:outline-none focus:ring-2 focus:ring-ring disabled:bg-secondary/50 disabled:cursor-not-allowed"
+                        className={`w-20 bg-input text-right rounded-md p-1 border focus:outline-none focus:ring-2 focus:ring-ring disabled:bg-secondary/50 disabled:cursor-not-allowed ${parameters.isManualAdjust && parameters.testing !== baseline.testing ? 'border-destructive text-destructive' : 'border-border text-foreground'}`}
                     />
                     <span className="ml-2 w-[11px] text-muted-foreground">%</span>
                     </div>
@@ -286,13 +324,14 @@ export const ProjectInfo: React.FC<ProjectInfoProps> = ({ parameters, setParamet
                   comment={parameters.generalComment}
                   commentName="generalComment"
                   onChange={handleParameterChange}
-                  isReadOnly
+                  isReadOnly={!parameters.isManualAdjust}
+                  highlight={!!parameters.isManualAdjust && parameters.general !== baseline.general}
                 />
                 <div className="pl-4 mt-2 space-y-2 border-l-2 border-border">
-                    <ParameterInput label="Отпуска" name="vacation" value={parameters.vacation} onChange={handleParameterChange} hours={overheadTotals.vacation} />
-                    <ParameterInput label="Больничные" name="sick_leave" value={parameters.sick_leave} onChange={handleParameterChange} hours={overheadTotals.sick_leave} />
-                    <ParameterInput label="Совещания" name="meetings" value={parameters.meetings} onChange={handleParameterChange} hours={overheadTotals.meetings} />
-                    <ParameterInput label="Онбординг" name="onboarding" value={parameters.onboarding} onChange={handleParameterChange} hours={overheadTotals.onboarding} />
+                    <ParameterInput label="Отпуска" name="vacation" value={parameters.vacation} onChange={handleParameterChange} hours={overheadTotals.vacation} highlight={!!parameters.isManualAdjust && parameters.vacation !== baseline.vacation} />
+                    <ParameterInput label="Больничные" name="sick_leave" value={parameters.sick_leave} onChange={handleParameterChange} hours={overheadTotals.sick_leave} highlight={!!parameters.isManualAdjust && parameters.sick_leave !== baseline.sick_leave} />
+                    <ParameterInput label="Совещания" name="meetings" value={parameters.meetings} onChange={handleParameterChange} hours={overheadTotals.meetings} highlight={!!parameters.isManualAdjust && parameters.meetings !== baseline.meetings} />
+                    <ParameterInput label="Онбординг" name="onboarding" value={parameters.onboarding} onChange={handleParameterChange} hours={overheadTotals.onboarding} highlight={!!parameters.isManualAdjust && parameters.onboarding !== baseline.onboarding} />
                 </div>
             </div>
         </div>

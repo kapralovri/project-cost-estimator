@@ -178,6 +178,11 @@ export const importExcelFromBackend = async (file: File, estimateId: number): Pr
         real: Number(task.estimates.find((e: any) => e.role === 'analysis')?.real || 0),
         max: Number(task.estimates.find((e: any) => e.role === 'analysis')?.max || 0),
       },
+      architect: {
+        min: Number(task.estimates.find((e: any) => e.role === 'architect')?.min || 0),
+        real: Number(task.estimates.find((e: any) => e.role === 'architect')?.real || 0),
+        max: Number(task.estimates.find((e: any) => e.role === 'architect')?.max || 0),
+      },
       frontDev: {
         min: Number(task.estimates.find((e: any) => e.role === 'frontDev')?.min || 0),
         real: Number(task.estimates.find((e: any) => e.role === 'frontDev')?.real || 0),
@@ -207,6 +212,16 @@ export const importExcelFromBackend = async (file: File, estimateId: number): Pr
         min: Number(task.estimates.find((e: any) => e.role === 'techWriter')?.min || 0),
         real: Number(task.estimates.find((e: any) => e.role === 'techWriter')?.real || 0),
         max: Number(task.estimates.find((e: any) => e.role === 'techWriter')?.max || 0),
+      },
+      adminTrack: {
+        min: Number(task.estimates.find((e: any) => e.role === 'adminTrack')?.min || 0),
+        real: Number(task.estimates.find((e: any) => e.role === 'adminTrack')?.real || 0),
+        max: Number(task.estimates.find((e: any) => e.role === 'adminTrack')?.max || 0),
+      },
+      stp: {
+        min: Number(task.estimates.find((e: any) => e.role === 'stp')?.min || 0),
+        real: Number(task.estimates.find((e: any) => e.role === 'stp')?.real || 0),
+        max: Number(task.estimates.find((e: any) => e.role === 'stp')?.max || 0),
       },
     },
   }));
