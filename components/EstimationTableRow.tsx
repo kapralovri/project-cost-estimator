@@ -172,8 +172,8 @@ export const EstimationTableRow: React.FC<EstimationTableRowProps> = ({ task, pa
                 if (isManualTesting) {
                     result.testing = getValue(task.estimates.testing);
                 } else {
-                    const backDev = getValue(task.estimates.backDev);
-                    const frontDev = getValue(task.estimates.frontDev);
+                    const backDev = enabledRoles.includes('backDev') ? getValue(task.estimates.backDev) : 0;
+                    const frontDev = enabledRoles.includes('frontDev') ? getValue(task.estimates.frontDev) : 0;
                     result.testing = (backDev + frontDev) * (parameters.testing / 100);
                 }
             } else {
@@ -183,7 +183,7 @@ export const EstimationTableRow: React.FC<EstimationTableRowProps> = ({ task, pa
         return result;
     }, [task, parameters, isManualTesting, enabledRoles]);
 
-    const { baseEstimate, riskHours, generalHours, managementHours, totalHours } = useMemo(() => {
+    const { baseEstimate, riskHours, generalHours, managementHours, totalHours, compRisk, compGeneral, compManagement } = useMemo(() => {
         const values = Object.values(pertValues) as number[];
         const base = values.reduce((sum: number, val: number) => sum + (val || 0), 0);
 
@@ -194,14 +194,20 @@ export const EstimationTableRow: React.FC<EstimationTableRowProps> = ({ task, pa
         const general = (base + risk) * (parameters.general / 100);
         const management = (base + risk + general) * (parameters.management / 100);
 
-        const total = base + risk + general + management;
+        const effRisk = typeof task.riskOverride === 'number' ? task.riskOverride : risk;
+        const effGeneral = typeof task.generalOverride === 'number' ? task.generalOverride : general;
+        const effManagement = typeof task.managementOverride === 'number' ? task.managementOverride : management;
+        const total = base + effRisk + effGeneral + effManagement;
         
         return {
-            baseEstimate: Math.round(base + risk),
-            riskHours: Math.round(risk),
-            generalHours: Math.round(general),
-            managementHours: Math.round(management),
-            totalHours: Math.round(total)
+            baseEstimate: Math.round(base + effRisk),
+            riskHours: Math.round(effRisk),
+            generalHours: Math.round(effGeneral),
+            managementHours: Math.round(effManagement),
+            totalHours: Math.round(total),
+            compRisk: Math.round(risk),
+            compGeneral: Math.round(general),
+            compManagement: Math.round(management),
         };
     }, [pertValues, parameters]);
 
@@ -319,9 +325,60 @@ export const EstimationTableRow: React.FC<EstimationTableRowProps> = ({ task, pa
               );
             })}
 
-            <td className="px-2 py-2 text-center border-l border-border">{riskHours}</td>
-            <td className="px-2 py-2 text-center">{generalHours}</td>
-            <td className="px-2 py-2 text-center">{managementHours}</td>
+            <td className="px-2 py-2 text-center border-l border-border">
+              {parameters.isManualAdjust ? (
+                <input
+                  type="number"
+                  min={0}
+                  value={riskHours}
+                  onChange={(e) => {
+                    const val = Math.max(0, Number(e.target.value) || 0);
+                    const updated = { ...task, riskOverride: val };
+                    onTaskChange(task.id, updated);
+                  }}
+                  onBlur={() => { if (estimateId) debouncedSaveTask({ ...task, riskOverride: riskHours }); }}
+                  className={`w-20 text-center rounded p-1 border focus:outline-none focus:ring-1 focus:ring-ring ${typeof task.riskOverride === 'number' ? 'border-destructive text-destructive' : 'border-border bg-background text-foreground'}`}
+                />
+              ) : (
+                riskHours
+              )}
+            </td>
+            <td className="px-2 py-2 text-center">
+              {parameters.isManualAdjust ? (
+                <input
+                  type="number"
+                  min={0}
+                  value={generalHours}
+                  onChange={(e) => {
+                    const val = Math.max(0, Number(e.target.value) || 0);
+                    const updated = { ...task, generalOverride: val };
+                    onTaskChange(task.id, updated);
+                  }}
+                  onBlur={() => { if (estimateId) debouncedSaveTask({ ...task, generalOverride: generalHours }); }}
+                  className={`w-20 text-center rounded p-1 border focus:outline-none focus:ring-1 focus:ring-ring ${typeof task.generalOverride === 'number' ? 'border-destructive text-destructive' : 'border-border bg-background text-foreground'}`}
+                />
+              ) : (
+                generalHours
+              )}
+            </td>
+            <td className="px-2 py-2 text-center">
+              {parameters.isManualAdjust ? (
+                <input
+                  type="number"
+                  min={0}
+                  value={managementHours}
+                  onChange={(e) => {
+                    const val = Math.max(0, Number(e.target.value) || 0);
+                    const updated = { ...task, managementOverride: val };
+                    onTaskChange(task.id, updated);
+                  }}
+                  onBlur={() => { if (estimateId) debouncedSaveTask({ ...task, managementOverride: managementHours }); }}
+                  className={`w-20 text-center rounded p-1 border focus:outline-none focus:ring-1 focus:ring-ring ${typeof task.managementOverride === 'number' ? 'border-destructive text-destructive' : 'border-border bg-background text-foreground'}`}
+                />
+              ) : (
+                managementHours
+              )}
+            </td>
             <td className="px-2 py-2 text-center font-bold bg-secondary/70">{totalHours}</td>
             <td className="px-2 py-2 text-center font-bold text-primary">{baseEstimate}</td>
         </tr>

@@ -23,6 +23,10 @@ export interface Task {
   isRisk: boolean;
   /** Включает режим факта по строке и делает PERT редактируемым */
   isActual?: boolean;
+  /** Ручные значения для столбцов Риски/Общие/Упр. (при включенной ручной корректировке) */
+  riskOverride?: number;
+  generalOverride?: number;
+  managementOverride?: number;
   estimates: Record<RoleKey, Estimate>;
 }
 

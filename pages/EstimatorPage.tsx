@@ -149,8 +149,8 @@ export const EstimatorPage: React.FC<EstimatorPageProps> = ({ project, onSave, o
     };
 
     tasks.forEach(task => {
-      const frontDev = getTaskHours(task, task.estimates.frontDev);
-      const backDev = getTaskHours(task, task.estimates.backDev);
+      const frontDev = enabledRoles.includes('frontDev') ? getTaskHours(task, task.estimates.frontDev) : 0;
+      const backDev = enabledRoles.includes('backDev') ? getTaskHours(task, task.estimates.backDev) : 0;
       const architect = getTaskHours(task, task.estimates.architect);
       baseByRole.analysis += getTaskHours(task, task.estimates.analysis);
       baseByRole.developers += frontDev + backDev + architect;
@@ -290,8 +290,8 @@ export const EstimatorPage: React.FC<EstimatorPageProps> = ({ project, onSave, o
       let base = 0;
       enabled.forEach(role => {
         if (role === 'testing') {
-          const frontDev = getRoleHours(task, 'frontDev');
-          const backDev = getRoleHours(task, 'backDev');
+          const frontDev = enabled.includes('frontDev') ? getRoleHours(task, 'frontDev') : 0;
+          const backDev = enabled.includes('backDev') ? getRoleHours(task, 'backDev') : 0;
           const testing = isManualTesting ? getRoleHours(task, 'testing') : (frontDev + backDev) * (parameters.testing / 100);
           base += testing;
         } else {
@@ -299,9 +299,16 @@ export const EstimatorPage: React.FC<EstimatorPageProps> = ({ project, onSave, o
         }
       });
 
-      const risk = base * (parameters.risks / 100);
-      const general = (base + risk) * (parameters.general / 100);
-      const management = (base + risk + general) * (parameters.management / 100);
+      // Применяем ручные корректировки по строке, если заданы
+      const compRisk = base * (parameters.risks / 100);
+      const effRisk = typeof task.riskOverride === 'number' ? task.riskOverride : compRisk;
+      const compGeneral = (base + compRisk) * (parameters.general / 100);
+      const effGeneral = typeof task.generalOverride === 'number' ? task.generalOverride : compGeneral;
+      const compManagement = (base + compRisk + compGeneral) * (parameters.management / 100);
+      const effManagement = typeof task.managementOverride === 'number' ? task.managementOverride : compManagement;
+      const risk = effRisk;
+      const general = effGeneral;
+      const management = effManagement;
       const total = base + risk + general + management;
       return sum + total;
     }, 0));

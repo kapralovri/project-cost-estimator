@@ -325,8 +325,8 @@ const App: React.FC = () => {
                 let base = 0;
                 enabled.forEach(role => {
                     if (role === 'testing') {
-                        const frontDev = getRoleHours('frontDev');
-                        const backDev = getRoleHours('backDev');
+                        const frontDev = enabled.includes('frontDev') ? getRoleHours('frontDev') : 0;
+                        const backDev = enabled.includes('backDev') ? getRoleHours('backDev') : 0;
                         const testing = isManualTesting ? getRoleHours('testing') : (frontDev + backDev) * (p.parameters.testing / 100);
                         base += testing;
                     } else {
@@ -334,9 +334,16 @@ const App: React.FC = () => {
                     }
                 });
 
-                const risk = base * (p.parameters.risks / 100);
-                const general = (base + risk) * (p.parameters.general / 100);
-                const management = (base + risk + general) * (p.parameters.management / 100);
+                // Apply manual overrides per task if present
+                const compRisk = base * (p.parameters.risks / 100);
+                const effRisk = typeof task.riskOverride === 'number' ? task.riskOverride : compRisk;
+                const compGeneral = (base + compRisk) * (p.parameters.general / 100);
+                const effGeneral = typeof task.generalOverride === 'number' ? task.generalOverride : compGeneral;
+                const compManagement = (base + compRisk + compGeneral) * (p.parameters.management / 100);
+                const effManagement = typeof task.managementOverride === 'number' ? task.managementOverride : compManagement;
+                const risk = effRisk;
+                const general = effGeneral;
+                const management = effManagement;
                 return sum + base + risk + general + management;
             }, 0);
 
