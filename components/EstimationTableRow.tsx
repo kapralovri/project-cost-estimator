@@ -8,21 +8,14 @@ interface EstimationTableRowProps {
   task: Task;
   parameters: ProjectParameters;
   estimateId?: number;
+  enabledRoles: RoleKey[];
   onTaskChange: (id: number, updatedTask: Task) => void;
   onRemoveTask: (id: number) => void;
 }
 
 const pert = (e: Estimate) => (e.min + 4 * e.real + e.max) / 6;
 
-const estimateGroups: { name: string, key: RoleKey }[] = [
-    { name: 'Анализ', key: 'analysis' },
-    { name: 'Front Dev', key: 'frontDev' },
-    { name: 'Back Dev', key: 'backDev' },
-    { name: 'Тестирование', key: 'testing' },
-    { name: 'Devops', key: 'devops' },
-    { name: 'Дизайнер', key: 'design' },
-    { name: 'Технические писатели', key: 'techWriter' },
-];
+const ROLE_ORDER: RoleKey[] = ['analysis','architect','frontDev','backDev','testing','devops','design','techWriter','adminTrack','stp'];
 
 const EstimateCell: React.FC<{ 
     value: number, 
@@ -43,7 +36,7 @@ const EstimateCell: React.FC<{
     </td>
 );
 
-export const EstimationTableRow: React.FC<EstimationTableRowProps> = ({ task, parameters, estimateId, onTaskChange, onRemoveTask }) => {
+export const EstimationTableRow: React.FC<EstimationTableRowProps> = ({ task, parameters, estimateId, enabledRoles, onTaskChange, onRemoveTask }) => {
     const isManualTesting = !!parameters.isManualTesting;
     const saveEstimateTimeoutRef = useRef<NodeJS.Timeout>();
     const saveTaskTimeoutRef = useRef<NodeJS.Timeout>();
@@ -82,12 +75,15 @@ export const EstimationTableRow: React.FC<EstimationTableRowProps> = ({ task, pa
                 sortOrder: 0,
                 estimates: [
                     { role: 'analysis', ...updatedTask.estimates.analysis },
+                    { role: 'architect', ...updatedTask.estimates.architect },
                     { role: 'frontDev', ...updatedTask.estimates.frontDev },
                     { role: 'backDev', ...updatedTask.estimates.backDev },
                     { role: 'testing', ...updatedTask.estimates.testing },
                     { role: 'devops', ...updatedTask.estimates.devops },
                     { role: 'design', ...updatedTask.estimates.design },
                     { role: 'techWriter', ...updatedTask.estimates.techWriter },
+                    { role: 'adminTrack', ...updatedTask.estimates.adminTrack },
+                    { role: 'stp', ...updatedTask.estimates.stp },
                 ]
             };
             
@@ -169,24 +165,23 @@ export const EstimationTableRow: React.FC<EstimationTableRowProps> = ({ task, pa
 
     const pertValues = useMemo(() => {
         const result: Record<RoleKey, number> = {} as any;
-        
-        const getPert = (estimate: Estimate) => task.isRisk ? estimate.max : pert(estimate);
+        const getValue = (estimate: Estimate) => task.isActual ? estimate.real : (task.isRisk ? estimate.max : pert(estimate));
 
-        estimateGroups.forEach(group => {
-            if (group.key === 'testing') {
+        ROLE_ORDER.filter(r => enabledRoles.includes(r)).forEach(role => {
+            if (role === 'testing') {
                 if (isManualTesting) {
-                    result.testing = getPert(task.estimates.testing);
+                    result.testing = getValue(task.estimates.testing);
                 } else {
-                    const backDev = getPert(task.estimates.backDev);
-                    const frontDev = getPert(task.estimates.frontDev);
+                    const backDev = getValue(task.estimates.backDev);
+                    const frontDev = getValue(task.estimates.frontDev);
                     result.testing = (backDev + frontDev) * (parameters.testing / 100);
                 }
             } else {
-                result[group.key] = getPert(task.estimates[group.key]);
+                result[role] = getValue(task.estimates[role]);
             }
         });
         return result;
-    }, [task, parameters, isManualTesting]);
+    }, [task, parameters, isManualTesting, enabledRoles]);
 
     const { baseEstimate, riskHours, generalHours, managementHours, totalHours } = useMemo(() => {
         const values = Object.values(pertValues) as number[];
@@ -210,14 +205,17 @@ export const EstimationTableRow: React.FC<EstimationTableRowProps> = ({ task, pa
         };
     }, [pertValues, parameters]);
 
+    const stickyBgStyle = task.isActual ? { backgroundColor: '#ffedd5' } : undefined;
+    const rowStyle = task.isActual ? { backgroundColor: '#ffedd5' } : undefined;
+
     return (
-        <tr className="border-b border-border group">
-            <td className="px-3 py-2 sticky left-0 bg-card group-hover:bg-secondary/50 z-10 transition-colors">
+        <tr className="border-b border-border group" style={rowStyle}>
+            <td className="px-3 py-2 sticky left-0 group-hover:bg-secondary/50 z-10 transition-colors" style={stickyBgStyle}>
                 <button onClick={() => onRemoveTask(task.id)} className="text-muted-foreground hover:text-destructive">
                     <TrashIcon />
                 </button>
             </td>
-            <td className="px-3 py-2 sticky left-12 bg-card group-hover:bg-secondary/50 z-10 transition-colors align-top">
+            <td className="px-3 py-2 sticky left-12 group-hover:bg-secondary/50 z-10 transition-colors align-top" style={stickyBgStyle}>
                 <AutoResizeTextarea
                   value={task.stage}
                   onChange={(v) => handleTextChange('stage', v)}
@@ -230,7 +228,7 @@ export const EstimationTableRow: React.FC<EstimationTableRowProps> = ({ task, pa
                   className="bg-transparent w-full focus:outline-none focus:bg-input p-1 rounded min-w-[138px]"
                 />
             </td>
-            <td className="px-3 py-2 sticky left-[210px] bg-card group-hover:bg-secondary/50 z-10 transition-colors align-top">
+            <td className="px-3 py-2 sticky left-[210px] group-hover:bg-secondary/50 z-10 transition-colors align-top" style={stickyBgStyle}>
                 <AutoResizeTextarea
                   value={task.name}
                   onChange={(v) => handleTextChange('name', v)}
@@ -243,7 +241,7 @@ export const EstimationTableRow: React.FC<EstimationTableRowProps> = ({ task, pa
                   className="bg-transparent w-full focus:outline-none focus:bg-input p-1 rounded min-w-[188px]"
                 />
             </td>
-            <td className="px-3 py-2 sticky left-[410px] bg-card group-hover:bg-secondary/50 z-10 transition-colors text-center">
+            <td className="px-3 py-2 sticky left-[410px] group-hover:bg-secondary/50 z-10 transition-colors text-center" style={stickyBgStyle}>
                 <input
                   type="checkbox"
                   checked={task.isRisk}
@@ -251,44 +249,71 @@ export const EstimationTableRow: React.FC<EstimationTableRowProps> = ({ task, pa
                   className="h-5 w-5 rounded border-border text-primary focus:ring-primary"
                 />
             </td>
+            <td className="px-3 py-2 text-center">
+                <input
+                  type="checkbox"
+                  checked={!!task.isActual}
+                  onChange={(e) => {
+                    const updated = { ...task, isActual: e.target.checked };
+                    onTaskChange(task.id, updated);
+                    debouncedSaveTask(updated);
+                  }}
+                  className="h-5 w-5 rounded border-border text-primary focus:ring-primary"
+                />
+            </td>
 
-            {estimateGroups.map(group => {
-              const isTesting = group.key === 'testing';
+            {ROLE_ORDER.filter(r => enabledRoles.includes(r)).map(roleKey => {
+              const isTesting = roleKey === 'testing';
               
               return (
-                <React.Fragment key={group.key}>
+                <React.Fragment key={roleKey}>
                     <EstimateCell 
-                        value={task.estimates[group.key].min} 
-                        onChange={(e) => handleEstimateChange(group.key, 'min', Math.max(0, Number(e.target.value) || 0))} 
+                        value={task.estimates[roleKey].min} 
+                        onChange={(e) => handleEstimateChange(roleKey, 'min', Math.max(0, Number(e.target.value) || 0))} 
                         onBlur={() => {
                             if (estimateId) {
-                                saveEstimateToBackend(group.key, task.estimates[group.key]);
+                                saveEstimateToBackend(roleKey, task.estimates[roleKey]);
                             }
                         }}
                         isReadOnly={isTesting && !isManualTesting} 
                     />
                     <EstimateCell 
-                        value={task.estimates[group.key].real} 
-                        onChange={(e) => handleEstimateChange(group.key, 'real', Math.max(0, Number(e.target.value) || 0))} 
+                        value={task.estimates[roleKey].real} 
+                        onChange={(e) => handleEstimateChange(roleKey, 'real', Math.max(0, Number(e.target.value) || 0))} 
                         onBlur={() => {
                             if (estimateId) {
-                                saveEstimateToBackend(group.key, task.estimates[group.key]);
+                                saveEstimateToBackend(roleKey, task.estimates[roleKey]);
                             }
                         }}
                         isReadOnly={isTesting && !isManualTesting} 
                     />
                     <EstimateCell 
-                        value={task.estimates[group.key].max} 
-                        onChange={(e) => handleEstimateChange(group.key, 'max', Math.max(0, Number(e.target.value) || 0))} 
+                        value={task.estimates[roleKey].max} 
+                        onChange={(e) => handleEstimateChange(roleKey, 'max', Math.max(0, Number(e.target.value) || 0))} 
                         onBlur={() => {
                             if (estimateId) {
-                                saveEstimateToBackend(group.key, task.estimates[group.key]);
+                                saveEstimateToBackend(roleKey, task.estimates[roleKey]);
                             }
                         }}
                         isReadOnly={isTesting && !isManualTesting} 
                     />
                     <td className="px-2 py-2 text-center font-bold text-primary bg-secondary/70 border-r border-l border-border">
-                        {Math.round((pertValues[group.key] as number) || 0)}
+                        {task.isActual ? (
+                          <input
+                            type="number"
+                            min={0}
+                            value={task.estimates[roleKey].real}
+                            onChange={(e) => handleEstimateChange(roleKey, 'real', Math.max(0, Number(e.target.value) || 0))}
+                            onBlur={() => {
+                              if (estimateId) {
+                                saveEstimateToBackend(roleKey, task.estimates[roleKey]);
+                              }
+                            }}
+                            className="w-16 text-center rounded p-1 border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                          />
+                        ) : (
+                          Math.round((pertValues[roleKey] as number) || 0)
+                        )}
                     </td>
                 </React.Fragment>
               );

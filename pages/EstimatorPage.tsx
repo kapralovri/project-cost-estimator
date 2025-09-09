@@ -15,6 +15,7 @@ interface EstimatorPageProps {
 export const EstimatorPage: React.FC<EstimatorPageProps> = ({ project, onSave, onBack }) => {
   const [tasks, setTasks] = useState<Task[]>(project.tasks);
   const [parameters, setParameters] = useState<ProjectParameters>(project.parameters);
+  const [enabledRoles, setEnabledRoles] = useState<RoleKey[]>(project.enabledRoles && project.enabledRoles.length ? project.enabledRoles : (['analysis','architect','frontDev','backDev','testing','devops','design','techWriter','adminTrack','stp'] as RoleKey[]));
   const [isTableFullscreen, setTableFullscreen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -37,12 +38,15 @@ export const EstimatorPage: React.FC<EstimatorPageProps> = ({ project, onSave, o
           sortOrder: tasks.length,
           estimates: [
             { role: 'analysis', min: 0, real: 0, max: 0 },
+            { role: 'architect', min: 0, real: 0, max: 0 },
             { role: 'frontDev', min: 0, real: 0, max: 0 },
             { role: 'backDev', min: 0, real: 0, max: 0 },
             { role: 'testing', min: 0, real: 0, max: 0 },
             { role: 'devops', min: 0, real: 0, max: 0 },
             { role: 'design', min: 0, real: 0, max: 0 },
             { role: 'techWriter', min: 0, real: 0, max: 0 },
+            { role: 'adminTrack', min: 0, real: 0, max: 0 },
+            { role: 'stp', min: 0, real: 0, max: 0 },
           ]
         };
         
@@ -61,12 +65,15 @@ export const EstimatorPage: React.FC<EstimatorPageProps> = ({ project, onSave, o
           isRisk: savedTask.complexity === 'high',
           estimates: {
             analysis: { min: 0, real: 0, max: 0 },
+            architect: { min: 0, real: 0, max: 0 },
             frontDev: { min: 0, real: 0, max: 0 },
             backDev: { min: 0, real: 0, max: 0 },
             testing: { min: 0, real: 0, max: 0 },
             devops: { min: 0, real: 0, max: 0 },
             design: { min: 0, real: 0, max: 0 },
             techWriter: { min: 0, real: 0, max: 0 },
+            adminTrack: { min: 0, real: 0, max: 0 },
+            stp: { min: 0, real: 0, max: 0 },
           }
         };
         
@@ -83,12 +90,15 @@ export const EstimatorPage: React.FC<EstimatorPageProps> = ({ project, onSave, o
         isRisk: false,
         estimates: {
           analysis: { min: 0, real: 0, max: 0 },
+          architect: { min: 0, real: 0, max: 0 },
           frontDev: { min: 0, real: 0, max: 0 },
           backDev: { min: 0, real: 0, max: 0 },
           testing: { min: 0, real: 0, max: 0 },
           devops: { min: 0, real: 0, max: 0 },
           design: { min: 0, real: 0, max: 0 },
           techWriter: { min: 0, real: 0, max: 0 },
+          adminTrack: { min: 0, real: 0, max: 0 },
+          stp: { min: 0, real: 0, max: 0 },
         }
       };
       setTasks(currentTasks => [...currentTasks, newTask]);
@@ -131,7 +141,7 @@ export const EstimatorPage: React.FC<EstimatorPageProps> = ({ project, onSave, o
 
     const isManualTesting = !!parameters.isManualTesting;
     const pert = (e: Estimate) => (e.min + 4 * e.real + e.max) / 6;
-    const getTaskHours = (task: Task, estimate: Estimate) => (task.isRisk ? estimate.max : pert(estimate));
+    const getTaskHours = (task: Task, estimate: Estimate) => (task.isActual ? estimate.real : (task.isRisk ? estimate.max : pert(estimate)));
 
     // 1) База по ролям (без PM)
     const baseByRole: Record<string, number> = {
@@ -141,8 +151,9 @@ export const EstimatorPage: React.FC<EstimatorPageProps> = ({ project, onSave, o
     tasks.forEach(task => {
       const frontDev = getTaskHours(task, task.estimates.frontDev);
       const backDev = getTaskHours(task, task.estimates.backDev);
+      const architect = getTaskHours(task, task.estimates.architect);
       baseByRole.analysis += getTaskHours(task, task.estimates.analysis);
-      baseByRole.developers += frontDev + backDev;
+      baseByRole.developers += frontDev + backDev + architect;
       baseByRole.devops += getTaskHours(task, task.estimates.devops);
       baseByRole.design += getTaskHours(task, task.estimates.design);
       baseByRole.techWriter += getTaskHours(task, task.estimates.techWriter);
@@ -218,10 +229,30 @@ export const EstimatorPage: React.FC<EstimatorPageProps> = ({ project, onSave, o
     const totalCalculatedHours = analyticsRaw.reduce((s, r) => s + r.totalHours, 0);
 
     // 5) Финальные проценты распределения
-    const analytics = analyticsRaw.map(r => ({
+    let analytics = analyticsRaw.map(r => ({
       ...r,
       distribution: totalCalculatedHours > 0 ? (r.totalHours / totalCalculatedHours) * 100 : 0,
     }));
+
+    // 6) Фильтрация по выбранным ролям для панели мониторинга
+    const permitted: Record<string, boolean> = {
+      developers: enabledRoles.some(r => ['frontDev','backDev','architect'].includes(r)),
+      qa: enabledRoles.some(r => ['testing','stp'].includes(r)),
+      analysis: enabledRoles.includes('analysis'),
+      devops: enabledRoles.includes('devops'),
+      techWriter: enabledRoles.includes('techWriter'),
+      design: enabledRoles.includes('design'),
+      pm: enabledRoles.includes('adminTrack'),
+    };
+    analytics = analytics.filter((r) => permitted[
+      r.name === 'Разработчики' ? 'developers'
+      : r.name === 'QA' ? 'qa'
+      : r.name === 'Аналитики' ? 'analysis'
+      : r.name === 'Devops' ? 'devops'
+      : r.name === 'Тех.писатели' ? 'techWriter'
+      : r.name === 'Дизайнеры' ? 'design'
+      : 'pm'
+    ]);
 
     // 6) Сводки по накладным (для отображения), согласованные с формулой
     const vacationHours = base * (parameters.vacation / 100);
@@ -244,33 +275,37 @@ export const EstimatorPage: React.FC<EstimatorPageProps> = ({ project, onSave, o
       }
     };
 
-  }, [tasks, parameters]);
+  }, [tasks, parameters, enabledRoles]);
 
   // Сумма "Итого" из раздела "Оценка проекта" по всем задачам
   const tableTotalHours = useMemo(() => {
-    const pert = (e: Estimate) => (e.min + 4 * e.real + e.max) / 6;
-    const getRoleHours = (task: Task, role: RoleKey) => task.isRisk ? task.estimates[role].max : pert(task.estimates[role]);
+    const pertVal = (e: Estimate) => (e.min + 4 * e.real + e.max) / 6;
+    const getRoleHours = (task: Task, role: RoleKey) => task.isActual ? task.estimates[role].real : (task.isRisk ? task.estimates[role].max : pertVal(task.estimates[role]));
 
     return Math.round(tasks.reduce((sum, task) => {
       const isManualTesting = !!parameters.isManualTesting;
-      const analysis = getRoleHours(task, 'analysis');
-      const frontDev = getRoleHours(task, 'frontDev');
-      const backDev = getRoleHours(task, 'backDev');
-      const devops = getRoleHours(task, 'devops');
-      const design = getRoleHours(task, 'design');
-      const techWriter = getRoleHours(task, 'techWriter');
-      const testing = isManualTesting
-        ? getRoleHours(task, 'testing')
-        : (frontDev + backDev) * (parameters.testing / 100);
+      const enabled = enabledRoles && enabledRoles.length
+        ? enabledRoles
+        : (['analysis','architect','frontDev','backDev','testing','devops','design','techWriter','adminTrack','stp'] as RoleKey[]);
+      let base = 0;
+      enabled.forEach(role => {
+        if (role === 'testing') {
+          const frontDev = getRoleHours(task, 'frontDev');
+          const backDev = getRoleHours(task, 'backDev');
+          const testing = isManualTesting ? getRoleHours(task, 'testing') : (frontDev + backDev) * (parameters.testing / 100);
+          base += testing;
+        } else {
+          base += getRoleHours(task, role);
+        }
+      });
 
-      const base = analysis + frontDev + backDev + devops + design + techWriter + testing;
       const risk = base * (parameters.risks / 100);
       const general = (base + risk) * (parameters.general / 100);
       const management = (base + risk + general) * (parameters.management / 100);
       const total = base + risk + general + management;
       return sum + total;
     }, 0));
-  }, [tasks, parameters]);
+  }, [tasks, parameters, enabledRoles]);
 
   const handleSave = useCallback(() => {
     setIsSaving(true);
@@ -279,11 +314,12 @@ export const EstimatorPage: React.FC<EstimatorPageProps> = ({ project, onSave, o
       onSave(project.id, {
         tasks,
         parameters,
-        totalHours: tableTotalHours
+        totalHours: tableTotalHours,
+        enabledRoles,
       });
       setIsSaving(false);
     }, 1000);
-  }, [project.id, tasks, parameters, onSave, tableTotalHours]);
+  }, [project.id, tasks, parameters, enabledRoles, onSave, tableTotalHours]);
 
   if (isTableFullscreen) {
     return (
@@ -296,6 +332,7 @@ export const EstimatorPage: React.FC<EstimatorPageProps> = ({ project, onSave, o
                 onImportTasks={handleImportTasks}
                 parameters={parameters}
                 estimateId={project.backendId}
+                enabledRoles={enabledRoles}
                 isFullscreen={isTableFullscreen}
                 toggleFullscreen={toggleFullscreen}
             />
@@ -320,6 +357,8 @@ export const EstimatorPage: React.FC<EstimatorPageProps> = ({ project, onSave, o
               qualityLevel={project.qualityLevel}
               parameters={parameters}
               setParameters={setParameters}
+              enabledRoles={enabledRoles}
+              setEnabledRoles={setEnabledRoles}
               totalHours={tableTotalHours}
               totalFTE={roleAnalyticsData.totalFTE}
               overheadTotals={roleAnalyticsData.overheadTotals}
@@ -330,17 +369,18 @@ export const EstimatorPage: React.FC<EstimatorPageProps> = ({ project, onSave, o
           </div>
         </div>
         <div>
-          <EstimationTable
-            tasks={tasks}
-            onTaskChange={handleTaskChange}
-            onAddTask={handleAddTask}
-            onRemoveTask={handleRemoveTask}
-            onImportTasks={handleImportTasks}
-            parameters={parameters}
-            estimateId={project.backendId}
-            isFullscreen={isTableFullscreen}
-            toggleFullscreen={toggleFullscreen}
-          />
+            <EstimationTable
+              tasks={tasks}
+              onTaskChange={handleTaskChange}
+              onAddTask={handleAddTask}
+              onRemoveTask={handleRemoveTask}
+              onImportTasks={handleImportTasks}
+              parameters={parameters}
+              estimateId={project.backendId}
+              enabledRoles={enabledRoles}
+              isFullscreen={isTableFullscreen}
+              toggleFullscreen={toggleFullscreen}
+            />
         </div>
       </main>
     </div>

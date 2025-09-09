@@ -4,13 +4,25 @@ export interface Estimate {
   max: number;
 }
 
-export type RoleKey = 'analysis' | 'frontDev' | 'backDev' | 'testing' | 'devops' | 'design' | 'techWriter';
+export type RoleKey =
+  | 'analysis'
+  | 'architect'
+  | 'frontDev'
+  | 'backDev'
+  | 'testing'
+  | 'devops'
+  | 'design'
+  | 'techWriter'
+  | 'adminTrack'
+  | 'stp';
 
 export interface Task {
   id: number;
   stage: string;
   name: string;
   isRisk: boolean;
+  /** Включает режим факта по строке и делает PERT редактируемым */
+  isActual?: boolean;
   estimates: Record<RoleKey, Estimate>;
 }
 
@@ -22,6 +34,8 @@ export interface ProjectParameters {
   testing: number;
   testingComment?: string;
   isManualTesting?: boolean;
+  /** Режим ручной корректировки параметров проекта */
+  isManualAdjust?: boolean;
   general: number;
   generalComment?: string;
   vacation: number;
@@ -113,4 +127,6 @@ export interface EstimateProject {
   qualityLevel: QualityLevel;
   parameters: ProjectParameters;
   tasks: Task[];
+  /** Список включенных ролей, участвующих в оценке */
+  enabledRoles?: RoleKey[];
 }
